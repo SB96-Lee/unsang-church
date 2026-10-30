@@ -114,10 +114,9 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.8 14.2c2.3.2 4 1.8 4.6 4.8"/></svg>
       <span class="count" id="count">1</span>
     </button>
-    <button class="tool" id="hymnBtn" aria-pressed="false" title="찬송 듣기">
+    <button class="tool" id="hymnBtn" aria-pressed="false" title="찬송 켜기/끄기" aria-label="찬송">
       <svg class="ico-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
       <svg class="ico-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
-      <span class="tlabel">찬송</span>
     </button>
     <button class="tool" id="meBtn" aria-expanded="false" aria-controls="mePanel" title="내 이름 바꾸기">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.8 3.6-6 7-6s6.2 2.2 7 6"/></svg>
@@ -606,7 +605,7 @@ function makeAvatar(hue){
   const halo = sprite(prayGlow, 0.9, 0.9, 0); halo.position.y = 1.55; root.add(halo);
   scene.add(root);
   return { root, body, head, arms, feet, halo, stoleMat,
-    pos: new THREE.Vector3(), ry: 0, walk: 0, moving: false, seat: false, pray: false, nodT: -9, prayW: 0 };
+    pos: new THREE.Vector3(), ry: 0, walk: 0, moving: false, seat: false, pray: false, nodT: -9, cheerT: -9, prayW: 0 };
 }
 
 function animateAvatar(a, dt, t){
@@ -621,12 +620,17 @@ function animateAvatar(a, dt, t){
   a.body.scale.set(sx, sy, sx);
   a.head.scale.set(1/sx, 1/sy, 1/sx); // 가운만 퍼지고 머리는 그대로
   for (const { pivot } of a.arms) pivot.scale.set(1/sx, 1/sy, 1/sx);
+  const ct = t - a.cheerT; // 할렐루야 만세: 0.3초에 올리고, 손을 흔들다가 2초에 내림
+  const c = ct >= 0 && ct < 2 ? Math.min(1, ct/0.3, (2 - ct)/0.4) : 0;
   for (const { pivot, s } of a.arms) {
-    pivot.rotation.set(sw*0.45*s*(1 - p) + p*-1.15, 0, (s*0.12)*(1 - p) + p*(-s*0.5));
+    const rx = sw*0.45*s*(1 - p) + p*-1.15, rz = (s*0.12)*(1 - p) + p*(-s*0.5);
+    const up = s*(2.75 + Math.sin(ct*12)*0.12);
+    pivot.rotation.set(rx*(1 - c), 0, rz*(1 - c) + up*c);
   }
   a.feet[0].position.z = a.seat ? 0.3 : 0.16 + sw*0.07; a.feet[1].position.z = a.seat ? 0.3 : 0.16 - sw*0.07;
   const nod = t - a.nodT < 1.2 ? Math.sin((t - a.nodT)/1.2*Math.PI*2) * 0.35 * Math.max(0, 1 - (t - a.nodT)/1.2) + Math.sin((t - a.nodT)/1.2*Math.PI)*0.2 : 0;
-  a.head.rotation.x = p*0.3 + nod;
+  a.head.rotation.x = (p*0.3 + nod)*(1 - c) - c*0.15;
+  if (c) a.body.position.y += Math.abs(Math.sin(ct*Math.PI*2))*0.05*c;
   a.halo.material.opacity = p * (0.5 + Math.sin(t*2.2)*0.18);
   a.halo.position.y = (a.seat ? 1.4 : 1.55) + Math.sin(t*1.5)*0.03;
 }
@@ -747,7 +751,7 @@ function applyPeer(p){
   if (actT && actT !== o.lastActT) {
     o.lastActT = actT;
     if (pr.act === 'amen') { o.av.nodT = clock.elapsedTime; showBubble(o, '아멘'); toast(`${o.nick}님이 아멘으로 화답했어요`); }
-    else if (pr.act === 'hallel') { o.av.nodT = clock.elapsedTime; showBubble(o, '할렐루야'); toast(`${o.nick}님이 할렐루야로 찬양했어요`); }
+    else if (pr.act === 'hallel') { o.av.cheerT = clock.elapsedTime; showBubble(o, '할렐루야'); toast(`${o.nick}님이 할렐루야로 찬양했어요`); }
     else if (pr.act === 'pray') toast(`${o.nick}님이 기도를 시작했어요`);
     else if (pr.act === 'candle') toast(`${o.nick}님이 촛불을 켰어요`);
   }
@@ -850,7 +854,7 @@ $('#amenBtn').onclick = () => {
   showBubble(selfBubbleHost, '아멘'); pushPresence();
 };
 $('#hallelBtn').onclick = () => {
-  me.nodT = clock.elapsedTime; myAct = 'hallel'; myActT = Date.now();
+  me.cheerT = clock.elapsedTime; myAct = 'hallel'; myActT = Date.now();
   showBubble(selfBubbleHost, '할렐루야'); pushPresence();
 };
 $('#candleBtn').onclick = () => {
