@@ -351,14 +351,68 @@ const sky = new THREE.Mesh(new THREE.SphereGeometry(300, 32, 16), new THREE.Shad
       float h = vP.y;
       vec3 top = vec3(0.30, 0.50, 0.82), mid = vec3(0.74, 0.85, 0.96), low = vec3(0.98, 0.95, 0.92), hor = vec3(1.0, 0.86, 0.68);
       vec3 c = h > 0.0 ? mix(mid, top, smoothstep(0.0, 0.65, h)) : mix(mid, low, smoothstep(0.0, -0.3, h));
-      float sun = pow(max(dot(vP, normalize(vec3(0.0, 0.12, -1.0))), 0.0), 6.0);
+      float sun = pow(max(dot(vP, normalize(vec3(0.0, 0.23, -1.0))), 0.0), 6.0);
       c = mix(c, hor, exp(-abs(h) * 8.0) * 0.6 + sun * 0.5);
       gl_FragColor = vec4(c, 1.0);
     }`
 }));
 scene.add(sky);
-const sunGlow = sprite(glowTex('rgba(255,252,238,1)', 'rgba(255,214,150,.5)'), 110, 110, .95);
-sunGlow.material.fog = false; sunGlow.position.set(0, 22, -230); scene.add(sunGlow);
+const sunGlow = sprite(glowTex('rgba(255,252,238,1)', 'rgba(255,214,150,.5)'), 70, 70, .55);
+sunGlow.material.fog = false; sunGlow.position.set(0, 55, -240); sunGlow.renderOrder = -2; scene.add(sunGlow);
+// 하늘의 예수님: 해를 후광 삼아 두 팔을 벌려 품어 주시는 모습 (빛으로 그린 그림)
+const embraceTex = canvasTex(1024, 1024, (g, w, h) => {
+  const cx = w/2;
+  const draw = (tint) => {
+    const F = c => tint || c;
+    // 겉옷 (넓게 퍼지는 흰 옷)
+    g.fillStyle = F('#f8eedb');
+    g.beginPath(); g.moveTo(cx - 70, 360); g.lineTo(cx + 70, 360); g.quadraticCurveTo(cx + 150, 700, cx + 230, 1024); g.lineTo(cx - 230, 1024); g.quadraticCurveTo(cx - 150, 700, cx - 70, 360); g.fill();
+    // 어깨에서 늘어진 푸른 겉옷 자락
+    g.fillStyle = F('rgba(120,160,215,.75)');
+    g.beginPath(); g.moveTo(cx - 80, 370); g.quadraticCurveTo(cx - 20, 520, cx + 70, 370); g.quadraticCurveTo(cx + 120, 620, cx + 60, 1024); g.lineTo(cx - 200, 1024); g.quadraticCurveTo(cx - 140, 640, cx - 80, 370); g.fill();
+    // 팔과 넓은 소매 (양옆으로 벌려 안아 주시는 모습)
+    for (const s of [-1, 1]) {
+      g.fillStyle = F('#f8eedb');
+      g.beginPath();
+      g.moveTo(cx + s*60, 370);
+      g.quadraticCurveTo(cx + s*230, 330, cx + s*380, 300);
+      g.lineTo(cx + s*395, 340);
+      g.quadraticCurveTo(cx + s*300, 470, cx + s*190, 520);
+      g.quadraticCurveTo(cx + s*120, 470, cx + s*70, 450);
+      g.closePath(); g.fill();
+      // 손 (손바닥을 펴서 맞이하는 손)
+      g.fillStyle = F('#f2d4b4');
+      g.beginPath(); g.ellipse(cx + s*412, 312, 26, 34, s*-0.5, 0, Math.PI*2); g.fill();
+    }
+    // 머리카락과 수염
+    g.fillStyle = F('#8a6a4a');
+    g.beginPath(); g.ellipse(cx, 262, 78, 92, 0, Math.PI, 0); g.lineTo(cx + 80, 380); g.quadraticCurveTo(cx, 360, cx - 80, 380); g.closePath(); g.fill();
+    // 얼굴
+    g.fillStyle = F('#f2d4b4'); g.beginPath(); g.ellipse(cx, 262, 54, 66, 0, 0, Math.PI*2); g.fill();
+    g.fillStyle = F('#8a6a4a'); g.beginPath(); g.ellipse(cx, 312, 46, 40, 0, 0, Math.PI); g.fill();
+    // 온화하게 감은 눈과 미소
+    if (tint) return;
+    g.strokeStyle = 'rgba(110,80,55,.8)'; g.lineWidth = 4; g.lineCap = 'round';
+    for (const s of [-1, 1]) { g.beginPath(); g.arc(cx + s*22, 252, 11, 0.15*Math.PI, 0.85*Math.PI); g.stroke(); }
+    g.beginPath(); g.arc(cx, 290, 14, 0.2*Math.PI, 0.8*Math.PI); g.stroke();
+  };
+  // 후광
+  const halo = g.createRadialGradient(cx, 250, 40, cx, 250, 260);
+  halo.addColorStop(0, 'rgba(255,248,220,1)'); halo.addColorStop(.45, 'rgba(255,226,160,.6)'); halo.addColorStop(1, 'rgba(255,220,150,0)');
+  g.fillStyle = halo; g.fillRect(0, 0, w, h);
+  // 번진 빛 → 또렷한 모습 순서로 겹쳐 그려 은은하게
+  g.save(); g.filter = 'blur(24px)'; g.globalAlpha = .95; draw('rgb(222,178,96)'); g.restore();
+  g.save(); g.filter = 'blur(3px)'; draw(); g.restore();
+  // 아래쪽은 구름 속으로 사라짐
+  g.globalCompositeOperation = 'destination-in';
+  const fade = g.createLinearGradient(0, 0, 0, h);
+  fade.addColorStop(0, 'rgba(0,0,0,1)'); fade.addColorStop(.55, 'rgba(0,0,0,.95)'); fade.addColorStop(.92, 'rgba(0,0,0,0)');
+  g.fillStyle = fade; g.fillRect(0, 0, w, h);
+  g.globalCompositeOperation = 'source-over';
+});
+const embrace = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshBasicMaterial({ map: embraceTex, transparent: true, opacity: .95, depthWrite: false, fog: false, toneMapped: false }));
+embrace.position.set(0, 12, -200); scene.add(embrace);
+
 
 // 구름 바다
 const puffTex = canvasTex(256, 256, (g) => {
@@ -427,14 +481,14 @@ function statueArm(fig, s, rx, rz){
   const h = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), statueStone); hand.add(h);
   return hand;
 }
-const ARM = { down: s => [0, s*0.15], pray: s => [-1.15, -s*0.5], hold: s => [-1.3, -s*0.15], up: s => [0, s*2.6], open: s => [-0.3, s*1.2] };
+const ARM = { point: s => [-1.75, -s*0.1], down: s => [0, s*0.15], pray: s => [-1.15, -s*0.5], hold: s => [-1.3, -s*0.15], up: s => [0, s*2.6], open: s => [-0.3, s*1.2] };
 function makeStatue(d){
   const g = new THREE.Group();
   box(1.5, 1.2, 1.5, marbleDark, 0, 0.6, 0, g);
   box(1.75, 0.15, 1.75, marble, 0, 1.27, 0, g);
   box(1.75, 0.15, 1.75, marble, 0, 0.07, 0, g);
-  const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.5), new THREE.MeshStandardMaterial({ map: d.plate = canvasTex(512, 200, () => {}), roughness: .5, metalness: .3 }));
-  plate.position.set(0, 0.68, 0.76); g.add(plate);
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.36, 0.98), new THREE.MeshStandardMaterial({ map: d.plate = canvasTex(640, 460, () => {}), roughness: .5, metalness: .3 }));
+  plate.position.set(0, 0.62, 0.76); g.add(plate);
   const fig = new THREE.Group(); fig.position.y = 1.34; g.add(fig);
   cyl(0.3, 0.58, 1.9, statueStone, 0, 0.95, 0, fig, 24);
   const cloak = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.64, 1.5, 24, 1, true, Math.PI*0.5, Math.PI), statueStone);
@@ -453,57 +507,82 @@ function makeStatue(d){
   return g;
 }
 const STATUES = [
-  { name: '선한 목자 예수', ref: '요한복음 10장 11절', hair: true, beard: true, halo: true, arms: ['hold', 'down'], extra(fig, [l, r]){
+  { name: '선한 목자 예수', ref: '요한복음 10장 11절', verse: '나는 선한 목자라 선한 목자는 양들을 위하여 목숨을 버리거니와', hair: true, beard: true, halo: true, arms: ['hold', 'down'], extra(fig, [l, r]){
       const lamb = new THREE.Group(); lamb.position.set(0, 2.02, -0.22); fig.add(lamb);
       [[-0.2, 0], [0, 0.04], [0.2, 0]].forEach(([x, y]) => { const b = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), statueStone); b.position.set(x, y, 0); lamb.add(b); });
       const lh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), statueStone); lh.position.set(0.38, 0.06, 0.06); lamb.add(lh);
       cyl(0.035, 0.035, 2.3, statueStone, 0, 0.3, 0, r, 8);
       const hook = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.035, 6, 16, Math.PI), statueStone); hook.position.set(0.15, 1.45, 0); r.add(hook);
   }},
-  { name: '모세', ref: '출애굽기 20장 1절', hair: true, beard: true, arms: ['up', 'up'], extra(fig, hands){
+  { name: '모세', ref: '출애굽기 20장 3절', verse: '너는 나 외에는 다른 신들을 네게 두지 말라', hair: true, beard: true, arms: ['up', 'up'], extra(fig, hands){
       hands.forEach(h => box(0.36, 0.52, 0.08, statueStone, 0, -0.32, 0, h));
   }},
-  { name: '노아', ref: '창세기 9장 13절', hair: true, beard: true, arms: ['down', 'up'], extra(fig, [l, r]){
+  { name: '노아', ref: '창세기 9장 13절', verse: '내가 내 무지개를 구름 속에 두었나니 이것이 나와 세상 사이의 언약의 증거니라', hair: true, beard: true, arms: ['down', 'up'], extra(fig, [l, r]){
       const dove = new THREE.Group(); dove.position.y = -0.2; r.add(dove);
       const body = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), statueStone); body.scale.set(1, .8, 1.6); dove.add(body);
       for (const s of [-1, 1]) { const wing = box(0.32, 0.03, 0.16, statueStone, s*0.18, 0.06, 0, dove); wing.rotation.z = s*0.4; }
   }},
-  { name: '베드로', ref: '마태복음 16장 18절', beard: true, arms: ['down', 'hold'], extra(fig, [l, r]){
+  { name: '베드로', ref: '마태복음 16장 16절', verse: '주는 그리스도시요 살아 계신 하나님의 아들이시니이다', beard: true, arms: ['down', 'hold'], extra(fig, [l, r]){
       cyl(0.03, 0.03, 0.5, gold, 0, -0.25, 0, r, 8);
       const bow = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.025, 6, 16), gold); bow.position.y = 0.05; r.add(bow);
       box(0.12, 0.03, 0.08, gold, 0.05, -0.45, 0, r);
   }},
-  { name: '성모 마리아', ref: '누가복음 1장 38절', veil: true, halo: true, arms: ['pray', 'pray'] },
-  { name: '다윗', ref: '시편 23편 1절', hair: true, arms: ['hold', 'hold'], extra(fig){
+  { name: '다윗', ref: '시편 23편 1절', verse: '여호와는 나의 목자시니 내게 부족함이 없으리로다', hair: true, arms: ['hold', 'hold'], extra(fig){
       const harp = new THREE.Group(); harp.position.set(0, 1.35, 0.5); fig.add(harp);
       box(0.06, 0.8, 0.06, statueStone, -0.18, 0, 0, harp);
       box(0.06, 0.62, 0.06, statueStone, 0.06, 0.06, 0, harp).rotation.z = 0.6;
       box(0.5, 0.06, 0.06, statueStone, 0.06, -0.38, 0, harp);
       for (let k = 0; k < 5; k++) cyl(0.006, 0.006, 0.6 - k*0.1, gold, -0.12 + k*0.07, -0.08 - k*0.04, 0, harp, 4);
   }},
-  { name: '아브라함', ref: '창세기 15장 5절', hair: true, beard: true, arms: ['down', 'up'], extra(fig, [l]){
+  { name: '아브라함', ref: '창세기 15장 6절', verse: '아브람이 여호와를 믿으니 여호와께서 이를 그의 의로 여기시고', hair: true, beard: true, arms: ['down', 'up'], extra(fig, [l]){
       cyl(0.035, 0.035, 2.2, statueStone, 0, 0.25, 0, l, 8);
   }},
-  { name: '바울', ref: '디모데후서 4장 7절', beard: true, arms: ['hold', 'down'], extra(fig, [l, r]){
+  { name: '세례 요한', ref: '요한복음 1장 29절', verse: '보라 세상 죄를 지고 가는 하나님의 어린 양이로다', hair: true, beard: true, arms: ['down', 'point'], extra(fig, [l]){
+      cyl(0.035, 0.035, 2.3, statueStone, 0, 0.3, 0, l, 8);
+      box(0.5, 0.05, 0.05, statueStone, 0, 1.1, 0, l);
+  }},
+  { name: '바울', ref: '디모데후서 4장 7절', verse: '나는 선한 싸움을 싸우고 나의 달려갈 길을 마치고 믿음을 지켰으니', beard: true, arms: ['hold', 'down'], extra(fig, [l, r]){
       box(0.32, 0.42, 0.09, statueStone, 0, 0, 0.05, l);
       box(0.07, 1.1, 0.025, statueStone, 0, -0.6, 0, r);
       box(0.3, 0.05, 0.05, statueStone, 0, -0.06, 0, r);
   }},
 ];
+// 한 줄 폭을 넘으면 글자 단위로 줄바꿈 (어절이 들어가면 어절 단위 우선)
+function wrapLines(g, text, maxW){
+  const lines = []; let line = '';
+  for (const word of text.split(' ')) {
+    const tryLine = line ? line + ' ' + word : word;
+    if (g.measureText(tryLine).width <= maxW) { line = tryLine; continue; }
+    if (line) lines.push(line);
+    line = word;
+    while (g.measureText(line).width > maxW) {
+      let k = line.length; while (k > 1 && g.measureText(line.slice(0, k)).width > maxW) k--;
+      lines.push(line.slice(0, k)); line = line.slice(k);
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
 function drawPlate(d){
-  const c = d.plate.image, g = c.getContext('2d');
-  const lg = g.createLinearGradient(0, 0, 0, 200); lg.addColorStop(0, '#b8914a'); lg.addColorStop(1, '#8a6a30');
-  g.fillStyle = lg; g.fillRect(0, 0, 512, 200);
-  g.strokeStyle = '#f3e1b0'; g.lineWidth = 4; g.strokeRect(10, 10, 492, 180);
-  g.textAlign = 'center'; g.fillStyle = '#fff6e0'; g.font = '700 54px "Gowun Batang", serif'; g.fillText(d.name, 256, 98);
-  g.fillStyle = '#f6e7c2'; g.font = '28px "Gowun Batang", serif'; g.fillText(d.ref, 256, 152);
+  const c = d.plate.image, g = c.getContext('2d'), w = c.width, h = c.height;
+  const lg = g.createLinearGradient(0, 0, 0, h); lg.addColorStop(0, '#b8914a'); lg.addColorStop(1, '#86662c');
+  g.fillStyle = lg; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#f3e1b0'; g.lineWidth = 5; g.strokeRect(12, 12, w - 24, h - 24);
+  g.textAlign = 'center';
+  g.fillStyle = '#fff6e0'; g.font = '700 56px "Gowun Batang", serif'; g.fillText(d.name, w/2, 92);
+  g.fillStyle = 'rgba(255,240,200,.55)'; g.fillRect(w/2 - 60, 116, 120, 2);
+  g.fillStyle = '#fffaf0'; g.font = '34px "Gowun Batang", serif';
+  const lines = wrapLines(g, '“' + d.verse + '”', w - 90);
+  const top = 178 + (3 - Math.min(lines.length, 3)) * 22;
+  lines.slice(0, 4).forEach((ln, i) => g.fillText(ln, w/2, top + i*48));
+  g.fillStyle = '#f6e7c2'; g.font = '28px "Gowun Batang", serif'; g.fillText(d.ref, w/2, h - 36);
   d.plate.needsUpdate = true;
 }
-const STATUE_Z = [-10, -2, 6, 14];
+const STATUE_SPOTS = [[-1, -10], [-1, -2], [-1, 6], [-1, 14], [1, -10], [1, -2], [1, 6], [1, 14]];
 STATUES.forEach((d, i) => {
-  const s = i < 4 ? -1 : 1;
+  const [s, z] = STATUE_SPOTS[i];
   const st = makeStatue(d);
-  st.position.set(s*11.5, 0, STATUE_Z[i % 4]); st.rotation.y = s < 0 ? Math.PI/2 : -Math.PI/2;
+  st.position.set(s*11.5, 0, z); st.rotation.y = s < 0 ? Math.PI/2 : -Math.PI/2;
   scene.add(st); drawPlate(d);
 });
 if (document.fonts) document.fonts.load('700 54px "Gowun Batang"').then(() => { drawVerse(); STATUES.forEach(drawPlate); }).catch(() => {});
@@ -592,7 +671,10 @@ function animateAvatar(a, dt, t){
   a.prayW += ((a.pray ? 1 : 0) - a.prayW) * Math.min(1, dt*6);
   const p = a.prayW;
   a.body.position.y = a.moving ? Math.abs(Math.sin(a.walk))*0.04 : Math.sin(t*1.6)*0.006;
-  a.body.scale.set(a.seat ? 1.14 : 1, a.seat ? 0.74 : 1, a.seat ? 1.14 : 1);
+  const sx = a.seat ? 1.14 : 1, sy = a.seat ? 0.74 : 1;
+  a.body.scale.set(sx, sy, sx);
+  a.head.scale.set(1/sx, 1/sy, 1/sx); // 가운만 퍼지고 머리는 그대로
+  for (const { pivot } of a.arms) pivot.scale.set(1/sx, 1/sy, 1/sx);
   for (const { pivot, s } of a.arms) {
     pivot.rotation.set(sw*0.45*s*(1 - p) + p*-1.15, 0, (s*0.12)*(1 - p) + p*(-s*0.5));
   }
@@ -600,7 +682,7 @@ function animateAvatar(a, dt, t){
   const nod = t - a.nodT < 1.2 ? Math.sin((t - a.nodT)/1.2*Math.PI*2) * 0.35 * Math.max(0, 1 - (t - a.nodT)/1.2) + Math.sin((t - a.nodT)/1.2*Math.PI)*0.2 : 0;
   a.head.rotation.x = p*0.3 + nod;
   a.halo.material.opacity = p * (0.5 + Math.sin(t*2.2)*0.18);
-  a.halo.position.y = (a.seat ? 1.2 : 1.55) + Math.sin(t*1.5)*0.03;
+  a.halo.position.y = (a.seat ? 1.4 : 1.55) + Math.sin(t*1.5)*0.03;
 }
 
 // ---------- 내 캐릭터 ----------
@@ -1010,8 +1092,8 @@ function frame(){
   markerT += dt; marker.material.opacity = Math.max(0, 0.9 - markerT*1.2); marker.scale.setScalar(1 + markerT*0.8);
   renderer.render(scene, camera);
   // 이름표
-  place(meLabel, me.pos, me.seat ? 1.45 : 1.75);
-  for (const o of others.values()) place(o.label, o.av.pos, o.av.seat ? 1.45 : 1.75);
+  place(meLabel, me.pos, me.seat ? 1.6 : 1.75);
+  for (const o of others.values()) place(o.label, o.av.pos, o.av.seat ? 1.6 : 1.75);
   for (const h of [selfBubbleHost, ...others.values()]) {
     if (!h.bubble) continue;
     const age = t - h.bubble.t0;
