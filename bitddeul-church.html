@@ -706,9 +706,11 @@ function makeAvatar(hue){
     arms.push({ pivot, s, hand });
   }
   const prayHands = new THREE.Group(); prayHands.visible = false; body.add(prayHands);
-  for (const x of [-0.021, 0.021]) {
-    const palm = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), skinMat);
-    palm.scale.set(0.38, 1.75, 0.85); palm.position.x = x; palm.castShadow = true; prayHands.add(palm);
+  // 맞댄 두 손바닥: 손목에서 손끝으로 갈수록 가늘어지는 모양
+  const palmGeo = new THREE.LatheGeometry([[0.001, 0], [0.026, 0.006], [0.033, 0.035], [0.03, 0.075], [0.019, 0.11], [0.001, 0.13]].map(([x, y]) => new THREE.Vector2(x, y)), 16);
+  for (const x of [-0.011, 0.011]) {
+    const palm = new THREE.Mesh(palmGeo, skinMat);
+    palm.scale.set(0.44, 1.15, 1.15); palm.position.x = x; palm.castShadow = true; prayHands.add(palm);
   }
   const halo = sprite(prayGlow, 0.9, 0.9, 0); halo.position.y = 1.55; root.add(halo);
   scene.add(root);
@@ -733,28 +735,33 @@ function animateAvatar(a, dt, t){
   const jt = t - a.juyeoT, jp = jt % JUYEO_GAP; // 주여 삼창: "주여!" 할 때마다 만세, 세 번
   const c = Math.max(ct >= 0 && ct < 2 ? Math.min(1, ct/0.3, (2 - ct)/0.4) : 0,
                      jt >= 0 && jt < JUYEO_GAP*3 ? Math.min(1, jp/0.15, (JUYEO_GAP - jp)/0.3) : 0);
-  // 기도: 가슴 앞에 모은 손을 올렸다 내리며 몸을 앞뒤로 크게 흔들고, 가끔 손을 얼굴까지 들어 간절히 기도
+  // 기도: 얼굴 앞에 모은 손을 두고 몸을 앞뒤로 크게 흔들며, 가끔 고개를 숙여 손에 이마를 댐
   const ph = t*1.6 + a.phase;
   const lift = Math.pow(Math.max(0, Math.sin(ph*0.37)), 4);
-  const prx = -1.0 + Math.sin(ph)*0.16 - lift*0.42, prz = 0.49;
-  a.body.rotation.x = p*(0.1 + Math.sin(ph*0.5)*0.11 + lift*0.06)*(1 - c);
+  a.body.rotation.x = p*(0.08 + Math.sin(ph*0.5)*0.1 + lift*0.06)*(1 - c);
   a.body.rotation.z = p*Math.sin(ph*0.4)*0.05*(1 - c);
+  // 손목 자리: 턱 아래쯤, 얼굴 앞 (실제 크기 기준으로 잡고 몸 좌표로 바꿈)
+  const wristY = 0.84*sy + 0.08 + Math.sin(ph)*0.035 + lift*0.06, wristZ = 0.4;
+  const tY = wristY/sy, tZ = wristZ/sx;
   for (const { pivot, s, hand } of a.arms) {
     hand.visible = p < 0.5 || c > 0.5;
-    const rx = sw*0.45*s*(1 - p) + p*prx, rz = (s*0.12)*(1 - p) + p*(-s*prz);
+    // 어깨에서 손목 자리로 팔을 뻗음 (팔 길이는 필요한 만큼 살짝 늘임)
+    const vx = -s*0.21, vy = tY - 0.74, vz = tZ, d = Math.hypot(vx, vy, vz); // 몸(눌린 좌표) 기준
+    const az = Math.asin(vx/d), ax = Math.atan2(-vz, -vy);
+    pivot.scale.y += (d/0.37 - pivot.scale.y)*p*(1 - c);
+    const rx = sw*0.45*s*(1 - p) + p*ax, rz = (s*0.12)*(1 - p) + p*az;
     const up = s*(2.75 + Math.sin(ct*12)*0.12);
     pivot.rotation.set(rx*(1 - c), 0, rz*(1 - c) + up*c);
   }
   a.prayHands.visible = p >= 0.5 && c <= 0.5;
   if (a.prayHands.visible) {
-    const piv = a.arms[0].pivot, ax = piv.rotation.x, az = piv.rotation.z, sc = piv.scale;
-    a.prayHands.position.set(0, piv.position.y - 0.4*Math.cos(az)*Math.cos(ax)*sc.y + 0.07, -0.4*Math.cos(az)*Math.sin(ax)*sc.y + 0.02);
-    a.prayHands.scale.copy(sc); // 앉을 때 몸이 눌려도 손 모양은 그대로
-    a.prayHands.rotation.x = -0.2 - lift*0.2;
+    a.prayHands.position.set(0, tY, tZ);
+    a.prayHands.scale.set(1/sx, 1/sy, 1/sx); // 앉을 때 몸이 눌려도 손 모양은 그대로
+    a.prayHands.rotation.x = -0.08;
   }
   a.feet[0].position.z = a.seat ? 0.3 : 0.16 + sw*0.07; a.feet[1].position.z = a.seat ? 0.3 : 0.16 - sw*0.07;
   const nod = t - a.nodT < 1.2 ? Math.sin((t - a.nodT)/1.2*Math.PI*2) * 0.35 * Math.max(0, 1 - (t - a.nodT)/1.2) + Math.sin((t - a.nodT)/1.2*Math.PI)*0.2 : 0;
-  a.head.rotation.x = (p*(0.28 + Math.sin(ph*0.5 + 1)*0.14 - lift*0.22) + nod)*(1 - c) - c*0.15;
+  a.head.rotation.x = (p*(0.12 + Math.sin(ph*0.5 + 1)*0.08 + lift*0.14) + nod)*(1 - c) - c*0.15;
   if (c) a.body.position.y += Math.abs(Math.sin(ct*Math.PI*2))*0.05*c;
   a.halo.material.opacity = p * (0.5 + Math.sin(t*2.2)*0.18);
   a.halo.position.y = (a.seat ? 1.4 : 1.55) + Math.sin(t*1.5)*0.03;
