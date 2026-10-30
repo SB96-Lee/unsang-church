@@ -102,7 +102,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 @media (max-width:520px){
   .brand small{display:none}
   .tool .tlabel{display:none}
-  .act{width:60px;font-size:12px}
+  .act{width:52px;font-size:11px}
 }
 @media (prefers-reduced-motion:reduce){.toast{animation:none}}
 </style>
@@ -183,6 +183,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
     <button class="act" id="hallelBtn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="2.3"/><path d="M12 11v6M9 21l3-4 3 4"/><path d="M12 12.5 7.5 9 5 3.5M12 12.5 16.5 9 19 3.5"/></svg>
       할렐루야
+    </button>
+    <button class="act" id="juyeoBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="10.5" r="2"/><path d="M12 12.8v5.2M9.5 21.5 12 18l2.5 3.5"/><path d="M12 14 8 11l-1.8-4.5M12 14l4-3 1.8-4.5"/><path d="M12 2.5v2M8.2 3.4l.9 1.7M15.8 3.4l-.9 1.7"/></svg>
+      주여 삼창
     </button>
     <button class="act" id="candleBtn" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3c1.6 1.8 2.2 3 2.2 4.2A2.2 2.2 0 0 1 12 9.4a2.2 2.2 0 0 1-2.2-2.2C9.8 6 10.4 4.8 12 3Z"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
@@ -699,14 +703,20 @@ function makeAvatar(hue){
     const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.36, 10), robeMat);
     arm.position.y = -0.18; arm.castShadow = true; pivot.add(arm);
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), skinMat); hand.position.y = -0.38; pivot.add(hand);
-    arms.push({ pivot, s });
+    arms.push({ pivot, s, hand });
+  }
+  const prayHands = new THREE.Group(); prayHands.visible = false; body.add(prayHands);
+  for (const x of [-0.021, 0.021]) {
+    const palm = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), skinMat);
+    palm.scale.set(0.38, 1.75, 0.85); palm.position.x = x; palm.castShadow = true; prayHands.add(palm);
   }
   const halo = sprite(prayGlow, 0.9, 0.9, 0); halo.position.y = 1.55; root.add(halo);
   scene.add(root);
-  return { root, body, head, arms, feet, halo, stoleMat,
-    pos: new THREE.Vector3(), ry: 0, walk: 0, moving: false, seat: false, pray: false, nodT: -9, cheerT: -9, prayW: 0, phase: Math.random()*6 };
+  return { root, body, head, arms, prayHands, feet, halo, stoleMat,
+    pos: new THREE.Vector3(), ry: 0, walk: 0, moving: false, seat: false, pray: false, nodT: -9, cheerT: -9, juyeoT: -9, prayW: 0, phase: Math.random()*6 };
 }
 
+const JUYEO_GAP = 1.1;
 function animateAvatar(a, dt, t){
   a.root.position.copy(a.pos);
   a.root.rotation.y = a.ry;
@@ -720,20 +730,31 @@ function animateAvatar(a, dt, t){
   a.head.scale.set(1/sx, 1/sy, 1/sx); // 가운만 퍼지고 머리는 그대로
   for (const { pivot } of a.arms) pivot.scale.set(1/sx, 1/sy, 1/sx);
   const ct = t - a.cheerT; // 할렐루야 만세: 0.3초에 올리고, 손을 흔들다가 2초에 내림
-  const c = ct >= 0 && ct < 2 ? Math.min(1, ct/0.3, (2 - ct)/0.4) : 0;
-  // 기도: 모은 손을 가슴께에서 천천히 올렸다 내리고, 가끔 간절히 더 들어 올림
-  const ph = t*1.5 + a.phase;
-  const lift = Math.pow(Math.max(0, Math.sin(ph*0.37)), 6);
-  const prx = -1.3 + Math.sin(ph)*0.08 - lift*0.3;
-  a.body.rotation.x = p*(0.05 + Math.sin(ph*0.5)*0.04 + lift*0.05)*(1 - c);
-  for (const { pivot, s } of a.arms) {
-    const rx = sw*0.45*s*(1 - p) + p*prx, rz = (s*0.12)*(1 - p) + p*(-s*0.5);
+  const jt = t - a.juyeoT, jp = jt % JUYEO_GAP; // 주여 삼창: "주여!" 할 때마다 만세, 세 번
+  const c = Math.max(ct >= 0 && ct < 2 ? Math.min(1, ct/0.3, (2 - ct)/0.4) : 0,
+                     jt >= 0 && jt < JUYEO_GAP*3 ? Math.min(1, jp/0.15, (JUYEO_GAP - jp)/0.3) : 0);
+  // 기도: 가슴 앞에 모은 손을 올렸다 내리며 몸을 앞뒤로 크게 흔들고, 가끔 손을 얼굴까지 들어 간절히 기도
+  const ph = t*1.6 + a.phase;
+  const lift = Math.pow(Math.max(0, Math.sin(ph*0.37)), 4);
+  const prx = -1.0 + Math.sin(ph)*0.16 - lift*0.42, prz = 0.49;
+  a.body.rotation.x = p*(0.1 + Math.sin(ph*0.5)*0.11 + lift*0.06)*(1 - c);
+  a.body.rotation.z = p*Math.sin(ph*0.4)*0.05*(1 - c);
+  for (const { pivot, s, hand } of a.arms) {
+    hand.visible = p < 0.5 || c > 0.5;
+    const rx = sw*0.45*s*(1 - p) + p*prx, rz = (s*0.12)*(1 - p) + p*(-s*prz);
     const up = s*(2.75 + Math.sin(ct*12)*0.12);
     pivot.rotation.set(rx*(1 - c), 0, rz*(1 - c) + up*c);
   }
+  a.prayHands.visible = p >= 0.5 && c <= 0.5;
+  if (a.prayHands.visible) {
+    const piv = a.arms[0].pivot, ax = piv.rotation.x, az = piv.rotation.z, sc = piv.scale;
+    a.prayHands.position.set(0, piv.position.y - 0.4*Math.cos(az)*Math.cos(ax)*sc.y + 0.07, -0.4*Math.cos(az)*Math.sin(ax)*sc.y + 0.02);
+    a.prayHands.scale.copy(sc); // 앉을 때 몸이 눌려도 손 모양은 그대로
+    a.prayHands.rotation.x = -0.2 - lift*0.2;
+  }
   a.feet[0].position.z = a.seat ? 0.3 : 0.16 + sw*0.07; a.feet[1].position.z = a.seat ? 0.3 : 0.16 - sw*0.07;
   const nod = t - a.nodT < 1.2 ? Math.sin((t - a.nodT)/1.2*Math.PI*2) * 0.35 * Math.max(0, 1 - (t - a.nodT)/1.2) + Math.sin((t - a.nodT)/1.2*Math.PI)*0.2 : 0;
-  a.head.rotation.x = (p*(0.3 + Math.sin(ph*0.5 + 1)*0.08 - lift*0.12) + nod)*(1 - c) - c*0.15;
+  a.head.rotation.x = (p*(0.28 + Math.sin(ph*0.5 + 1)*0.14 - lift*0.22) + nod)*(1 - c) - c*0.15;
   if (c) a.body.position.y += Math.abs(Math.sin(ct*Math.PI*2))*0.05*c;
   a.halo.material.opacity = p * (0.5 + Math.sin(t*2.2)*0.18);
   a.halo.position.y = (a.seat ? 1.4 : 1.55) + Math.sin(t*1.5)*0.03;
@@ -825,7 +846,7 @@ function presenceObj(){
     seat: me.seat, pray: me.pray, candle: myCandle, act: myAct, actT: myActT };
 }
 let myAct = '', myActT = 0;
-const ACT_MSG = { pray: '기도를 시작했어요', amen: '아멘으로 화답했어요', hallel: '할렐루야로 찬양했어요', candle: '촛불을 켰어요', candleOff: '촛불을 껐어요' };
+const ACT_MSG = { pray: '기도를 시작했어요', amen: '아멘으로 화답했어요', hallel: '할렐루야로 찬양했어요', juyeo: '주여 삼창을 외쳤어요', candle: '촛불을 켰어요', candleOff: '촛불을 껐어요' };
 function pushPresence(){
   if (!room) return;
   const now = performance.now();
@@ -857,6 +878,7 @@ function applyPeer(p){
     o.lastActT = actT;
     if (pr.act === 'amen') { o.av.nodT = clock.elapsedTime; showBubble(o, '아멘'); }
     else if (pr.act === 'hallel') { o.av.cheerT = clock.elapsedTime; showBubble(o, '할렐루야'); }
+    else if (pr.act === 'juyeo') juyeo(o, o.av);
     if (ACT_MSG[pr.act]) toast(`${o.nick}님이 ${ACT_MSG[pr.act]}`);
   }
 }
@@ -918,6 +940,7 @@ async function startRelay(){
 
 (async () => {
   try {
+    if (new URLSearchParams(location.search).has('offline')) return; // 화면 확인용: 다른 사람 방에 들어가지 않음
     if (!window.claude?.use) { await startRelay(); return; }
     room = await window.claude.use('room');
     if (!room) return;
@@ -956,6 +979,13 @@ $('#prayBtn').onclick = () => {
 $('#amenBtn').onclick = () => {
   me.nodT = clock.elapsedTime; myAct = 'amen'; myActT = Date.now(); toast(`${myNick}님이 ${ACT_MSG.amen}`);
   showBubble(selfBubbleHost, '아멘'); pushPresence();
+};
+function juyeo(host, av){
+  av.juyeoT = clock.elapsedTime;
+  for (let i = 0; i < 3; i++) setTimeout(() => { if (av.root.parent) showBubble(host, i < 2 ? '주여!' : '주여!!'); }, i*JUYEO_GAP*1000); // 그 사이 나간 사람은 건너뜀
+}
+$('#juyeoBtn').onclick = () => {
+  juyeo(selfBubbleHost, me); myAct = 'juyeo'; myActT = Date.now(); toast(`${myNick}님이 ${ACT_MSG.juyeo}`); pushPresence();
 };
 $('#hallelBtn').onclick = () => {
   me.cheerT = clock.elapsedTime; myAct = 'hallel'; myActT = Date.now(); toast(`${myNick}님이 ${ACT_MSG.hallel}`);
