@@ -1185,11 +1185,12 @@ $('#hymnBtn').onclick = () => setHymn(!audio);
 $('#hymnOn').onclick = () => setHymn(true);
 $('#hymnOff').onclick = () => setHymn(false);
 
-// ---------- 함께 기도하는 이웃 (이 화면에만 보이는 캐릭터 4명) ----------
+// ---------- 함께 기도하는 이웃 (이 화면에만 보이는 캐릭터 3~9명) ----------
 // 걸어 다니다 빈 방석에 앉아 기도하고, 가끔 아멘·할렐루야·주여 삼창을 함. 사람 수와 목록에도 함께 보임
 {
   const used = new Set([myNick]);
-  for (let i = 0; i < 4; i++) {
+  const npcN = 3 + (Math.random()*7|0); // 들어올 때마다 3~9명
+  for (let i = 0; i < npcN; i++) {
     let nick; do nick = randNick(); while (used.has(nick)); used.add(nick);
     const hue = Math.random()*360|0, av = makeAvatar(hue);
     av.pos.set((Math.random() - 0.5)*14, 0, -10 + Math.random()*26); av.ry = Math.PI;
