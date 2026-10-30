@@ -485,9 +485,13 @@ function drawVerse(){
 }
 drawVerse();
 const stele = new THREE.Group(); stele.position.set(-11.2, 0, -15.6); stele.rotation.y = 0.35; scene.add(stele);
-box(3.8, 1.8, 0.35, marble, 0, 0.9, 0, stele);
+// 대리석 받침 위에 올려 눈높이에서 읽히게
+box(4.2, 0.3, 1.1, marbleDark, 0, 0.15, 0, stele);
+box(3.4, 1.0, 0.7, marble, 0, 0.8, 0, stele);
+box(3.6, 0.1, 0.8, gold, 0, 1.33, 0, stele);
+box(3.8, 1.8, 0.35, marble, 0, 2.28, 0, stele);
 const verse = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.2), new THREE.MeshStandardMaterial({ map: verseTex, roughness: .8 }));
-verse.position.set(0, 0.95, 0.18); stele.add(verse);
+verse.position.set(0, 2.33, 0.18); stele.add(verse);
 
 // 하늘
 const sky = new THREE.Mesh(new THREE.SphereGeometry(300, 32, 16), new THREE.ShaderMaterial({
