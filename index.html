@@ -918,7 +918,7 @@ function syncPeers(peers){
   if (!$('#peoplePanel').hidden) renderPeople();
 }
 const npcs = []; // 함께 기도하는 이웃 (아래에서 채움)
-function refreshCount(){ $('#count').textContent = 1 + others.size + npcs.length; }
+function refreshCount(){ $('#count').textContent = 1 + others.size + npcs.filter(n => n.on).length; }
 
 // claude.ai 밖(일반 웹 주소)에서는 공용 중계 서버(MQTT)로 서로의 위치와 동작을 주고받음
 const RELAY_URL = 'wss://broker.emqx.io:8084/mqtt';
@@ -1137,7 +1137,7 @@ function renderPeople(){
   const tagOf = (pray, candle, seat) => [pray && '기도 중', candle && '촛불', !pray && seat && '앉음'].filter(Boolean).join(' · ');
   row(myNick, myHue, tagOf(me.pray, myCandle, me.seat), true);
   for (const o of others.values()) row(o.nick, o.hue, tagOf(o.av.pray, o.candle, o.av.seat), false);
-  for (const n of npcs) row(n.nick, n.hue, tagOf(n.av.pray, false, n.av.seat), false);
+  for (const n of npcs) if (n.on) row(n.nick, n.hue, tagOf(n.av.pray, false, n.av.seat), false);
 }
 
 // ---------- 찬송 (Amazing Grace, 공공 저작물) ----------
@@ -1192,24 +1192,55 @@ $('#hymnBtn').onclick = () => setHymn(!audio);
 $('#hymnOn').onclick = () => setHymn(true);
 $('#hymnOff').onclick = () => setHymn(false);
 
-// ---------- 함께 기도하는 이웃 (이 화면에만 보이는 캐릭터 3~9명) ----------
-// 걸어 다니다 빈 방석에 앉아 기도하고, 가끔 아멘·할렐루야·주여 삼창을 함. 사람 수와 목록에도 함께 보임
-{
-  const used = new Set([myNick]);
-  const npcN = 3 + (Math.random()*7|0); // 들어올 때마다 3~9명
-  for (let i = 0; i < npcN; i++) {
-    let nick; do nick = randNick(); while (used.has(nick)); used.add(nick);
-    const hue = Math.random()*360|0, av = makeAvatar(hue);
-    av.pos.set((Math.random() - 0.5)*14, 0, -10 + Math.random()*26); av.ry = Math.PI;
-    const label = document.createElement('div'); label.className = 'label'; label.textContent = nick; $('#labels').appendChild(label);
-    npcs.push({ av, nick, hue, label, bubble: null, goal: null, cushion: null, mode: 'idle', wait: 1 + Math.random()*6, nextAct: 0 });
-  }
-  refreshCount();
+// ---------- 함께 기도하는 이웃 (모두에게 똑같이 보이는 캐릭터 3~9명) ----------
+// 서버 없이 '지금 시각'만으로 정해짐: 10분마다 인원이 바뀌고, 누가 언제 어느 방석에서 기도하는지도
+// 시각에서 계산하므로 같은 시각에 접속한 사람은 모두 같은 이웃을 봄. 매 정시에는 전원이 교대
+const NPC_MAX = 9, NPC_PERIOD = 600, NPC_RUN = 6; // 10분 단위, 최대 1시간(6칸) 머묾
+const NPC_SPEED = 1.7, GATE_Z = 26;
+function rng(seed){
+  let x = seed >>> 0;
+  return () => { x = x + 0x6D2B79F5 | 0; let t = Math.imul(x ^ x >>> 15, 1 | x); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-function npcFreeCushion(n){
-  const free = CUSHIONS.filter(c => !cushionTaken(c, n))
-    .sort((a, b) => Math.hypot(a.x - n.av.pos.x, a.z - n.av.pos.z) - Math.hypot(b.x - n.av.pos.x, b.z - n.av.pos.z));
-  return free[Math.random()*Math.min(8, free.length)|0] || null;
+const npcCountAt = P => 3 + (rng(P*7919 + 13)()*7 | 0);
+const slotOn = (k, P) => k < npcCountAt(P);
+function npcRun(k, P){ // 이 칸(k)이 P 구간에 있다면, 연속으로 머무는 구간의 시작과 끝
+  let s = P, e = P;
+  while (s % NPC_RUN !== 0 && slotOn(k, s - 1)) s--;
+  while ((e + 1) % NPC_RUN !== 0 && slotOn(k, e + 1)) e++;
+  return [s, e];
+}
+function npcSchedule(k, ps, pe){
+  const r = rng(ps*131 + k*7 + 1);
+  const hour = Math.floor(ps/NPC_RUN);
+  const nick = ADJ[r()*ADJ.length | 0] + ' ' + NOUN[(k + (rng(hour*977 + 5)()*NOUN.length | 0)) % NOUN.length]; // 같은 시간대 이웃끼리 이름이 겹치지 않음
+  const hue = r()*360 | 0;
+  const myCush = CUSHIONS.filter((c, i) => i % NPC_MAX === k); // 이웃끼리 같은 방석에 앉지 않게 나눠 가짐
+  const segs = [], leaveBy = (pe + 1)*NPC_PERIOD - 30;
+  let t = ps*NPC_PERIOD + k*6 + r()*20, pos = { x: (r() - 0.5)*2, z: GATE_Z };
+  const walkT = to => Math.hypot(to.x - pos.x, to.z - pos.z)/NPC_SPEED;
+  const walk = to => { const d = walkT(to); segs.push({ type: 'walk', t0: t, t1: t + d, from: pos, to }); t += d; pos = { x: to.x, z: to.z }; };
+  for (;;) {
+    if (r() < 0.35) {
+      const to = { x: (r() - 0.5)*18, z: -14 + r()*36 }, idle = 3 + r()*5;
+      if (t + walkT(to) + idle > leaveBy) break;
+      walk(to); segs.push({ type: 'idle', t0: t, t1: t + idle, pos }); t += idle;
+    }
+    const c = myCush[r()*myCush.length | 0], dur = 30 + r()*40;
+    if (t + walkT(c) + dur + 3 > leaveBy) break;
+    walk(c);
+    const seg = { type: 'sit', t0: t, t1: t + dur + 3, pos, cushion: c, pray0: t + 1.5, pray1: t + dur + 1.5, acts: [] };
+    for (let at = seg.pray0 + 12 + r()*20; at < seg.pray1 - 3; at += 25 + r()*30) {
+      const q = r(); seg.acts.push({ t: at, act: q < 0.5 ? 'amen' : q < 0.8 ? 'hallel' : 'juyeo' });
+    }
+    segs.push(seg); t = seg.t1;
+  }
+  walk({ x: (r() - 0.5)*2, z: GATE_Z + 0.5 }); // 입구로 나감
+  return { nick, hue, segs };
+}
+for (let k = 0; k < NPC_MAX; k++) {
+  const av = makeAvatar(0); av.root.visible = false;
+  const label = document.createElement('div'); label.className = 'label'; label.style.visibility = 'hidden'; $('#labels').appendChild(label);
+  npcs.push({ k, av, label, bubble: null, on: false, runKey: null, plan: null, nick: '', hue: 0, cushion: null, lastT: 0 });
 }
 function npcSay(n, act){
   const a = n.av, t = clock.elapsedTime;
@@ -1219,40 +1250,43 @@ function npcSay(n, act){
   toast(`${n.nick}님이 ${ACT_MSG[act]}`);
 }
 function updateNpcs(dt, t){
+  const T = Date.now()/1000, P = Math.floor(T/NPC_PERIOD);
+  let changed = false;
   for (const n of npcs) {
     const a = n.av;
-    a.moving = false;
-    if (n.goal) {
-      const dx = n.goal.x - a.pos.x, dz = n.goal.z - a.pos.z, d = Math.hypot(dx, dz);
-      if (d < 0.05) {
-        a.pos.x = n.goal.x; a.pos.z = n.goal.z; n.goal = null;
-        if (n.mode === 'toCushion') { a.seat = true; a.ry = Math.PI; n.mode = 'sit'; n.wait = 1.5 + Math.random()*2; }
-        else { n.mode = 'idle'; n.wait = 2 + Math.random()*5; }
-      } else {
-        const step = Math.min(d, 1.7*dt);
-        a.pos.x += dx/d*step; a.pos.z += dz/d*step;
-        a.ry = angLerp(a.ry, Math.atan2(dx, dz), Math.min(1, dt*8)); a.moving = true;
+    let seg = null;
+    if (slotOn(n.k, P)) {
+      const [ps, pe] = npcRun(n.k, P);
+      if (n.runKey !== ps) {
+        n.runKey = ps; n.plan = npcSchedule(n.k, ps, pe);
+        n.nick = n.plan.nick; n.hue = n.plan.hue; n.label.textContent = n.nick;
+        a.stoleMat.color.setHSL(n.hue/360, .55, .48); n.lastT = T;
       }
-    } else if ((n.wait -= dt) <= 0) {
-      if (n.mode === 'idle') {
-        const c = Math.random() < 0.65 ? npcFreeCushion(n) : null;
-        if (c) { n.cushion = c; n.goal = c; n.mode = 'toCushion'; }
-        else { n.goal = { x: (Math.random() - 0.5)*18, z: -14 + Math.random()*36 }; n.mode = 'stroll'; }
-      } else if (n.mode === 'sit') {
-        a.pray = true; n.mode = 'pray'; n.wait = 30 + Math.random()*40; n.nextAct = 12 + Math.random()*20;
-        toast(`${n.nick}님이 ${ACT_MSG.pray}`);
-      } else if (n.mode === 'pray') {
-        a.pray = false; a.seat = false; n.cushion = null; n.mode = 'idle'; n.wait = 1 + Math.random()*2;
+      seg = n.plan.segs.find(g => T >= g.t0 && T < g.t1) || null;
+    }
+    const on = !!seg;
+    if (on !== n.on) { n.on = on; a.root.visible = on; changed = true; if (!on) { n.label.style.visibility = 'hidden'; a.seat = a.pray = false; n.cushion = null; } }
+    if (!on) continue;
+    a.moving = false; a.seat = false; a.pray = false; n.cushion = null;
+    if (seg.type === 'walk') {
+      const f = (T - seg.t0)/(seg.t1 - seg.t0), dx = seg.to.x - seg.from.x, dz = seg.to.z - seg.from.z;
+      a.pos.x = seg.from.x + dx*f; a.pos.z = seg.from.z + dz*f;
+      a.ry = angLerp(a.ry, Math.atan2(dx, dz), Math.min(1, dt*8)); a.moving = true;
+    } else {
+      a.pos.x = seg.pos.x; a.pos.z = seg.pos.z;
+      if (seg.type === 'sit') {
+        a.seat = true; a.ry = Math.PI; n.cushion = seg.cushion;
+        a.pray = T >= seg.pray0 && T < seg.pray1;
+        // 지난 프레임 이후에 일어난 일만 알림 (막 들어온 사람에게 지난 일을 몰아서 띄우지 않음)
+        if (seg.pray0 > n.lastT && seg.pray0 <= T) toast(`${n.nick}님이 ${ACT_MSG.pray}`);
+        for (const e of seg.acts) if (e.t > n.lastT && e.t <= T) npcSay(n, e.act);
       }
     }
-    if (n.mode === 'pray' && (n.nextAct -= dt) <= 0) {
-      const r = Math.random();
-      npcSay(n, r < 0.5 ? 'amen' : r < 0.8 ? 'hallel' : 'juyeo');
-      n.nextAct = 25 + Math.random()*30;
-    }
+    n.lastT = T;
     a.pos.y = a.seat ? CUSHION_TOP : groundY(a.pos.x, a.pos.z);
     animateAvatar(a, dt, t);
   }
+  if (changed) { refreshCount(); if (!$('#peoplePanel').hidden) renderPeople(); }
 }
 
 // ---------- 이름표 ----------
@@ -1340,7 +1374,7 @@ function frame(){
   renderer.render(scene, camera);
   // 이름표
   place(meLabel, me.pos, me.seat ? 1.6 : 1.75);
-  for (const o of [...others.values(), ...npcs]) place(o.label, o.av.pos, o.av.seat ? 1.6 : 1.75);
+  for (const o of [...others.values(), ...npcs.filter(n => n.on)]) place(o.label, o.av.pos, o.av.seat ? 1.6 : 1.75);
   for (const h of [selfBubbleHost, ...others.values(), ...npcs]) {
     if (!h.bubble) continue;
     const age = t - h.bubble.t0;
