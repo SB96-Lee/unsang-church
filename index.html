@@ -917,7 +917,8 @@ function syncPeers(peers){
   refreshCount(); refreshCandles();
   if (!$('#peoplePanel').hidden) renderPeople();
 }
-function refreshCount(){ $('#count').textContent = 1 + others.size; }
+const npcs = []; // 함께 기도하는 이웃 (아래에서 채움)
+function refreshCount(){ $('#count').textContent = 1 + others.size + npcs.length; }
 
 // claude.ai 밖(일반 웹 주소)에서는 공용 중계 서버(MQTT)로 서로의 위치와 동작을 주고받음
 const RELAY_URL = 'wss://broker.emqx.io:8084/mqtt';
@@ -975,7 +976,7 @@ async function startRelay(){
 function setNote(){
   $('#roomNote').textContent = room
     ? '이 링크를 연 사람이 실시간으로 함께 보여요. 서로의 기도와 아멘, 촛불이 전해져요.'
-    : '지금은 혼자 예배드리는 화면이에요. 함께 접속할 수 있는 환경에서 열면 다른 사람이 보여요.';
+    : '지금 예배당에서 함께 기도하는 사람들이에요.';
 }
 setNote();
 
@@ -1136,6 +1137,7 @@ function renderPeople(){
   const tagOf = (pray, candle, seat) => [pray && '기도 중', candle && '촛불', !pray && seat && '앉음'].filter(Boolean).join(' · ');
   row(myNick, myHue, tagOf(me.pray, myCandle, me.seat), true);
   for (const o of others.values()) row(o.nick, o.hue, tagOf(o.av.pray, o.candle, o.av.seat), false);
+  for (const n of npcs) row(n.nick, n.hue, tagOf(n.av.pray, false, n.av.seat), false);
 }
 
 // ---------- 찬송 (Amazing Grace, 공공 저작물) ----------
@@ -1191,17 +1193,17 @@ $('#hymnOn').onclick = () => setHymn(true);
 $('#hymnOff').onclick = () => setHymn(false);
 
 // ---------- 함께 기도하는 이웃 (이 화면에만 보이는 캐릭터 4명) ----------
-// 걸어 다니다 빈 방석에 앉아 기도하고, 가끔 아멘·할렐루야·주여 삼창을 함. 접속자 수에는 넣지 않음
-const npcs = [];
+// 걸어 다니다 빈 방석에 앉아 기도하고, 가끔 아멘·할렐루야·주여 삼창을 함. 사람 수와 목록에도 함께 보임
 {
   const used = new Set([myNick]);
   for (let i = 0; i < 4; i++) {
     let nick; do nick = randNick(); while (used.has(nick)); used.add(nick);
-    const av = makeAvatar(Math.random()*360|0);
+    const hue = Math.random()*360|0, av = makeAvatar(hue);
     av.pos.set((Math.random() - 0.5)*14, 0, -10 + Math.random()*26); av.ry = Math.PI;
     const label = document.createElement('div'); label.className = 'label'; label.textContent = nick; $('#labels').appendChild(label);
-    npcs.push({ av, nick, label, bubble: null, goal: null, cushion: null, mode: 'idle', wait: 1 + Math.random()*6, nextAct: 0 });
+    npcs.push({ av, nick, hue, label, bubble: null, goal: null, cushion: null, mode: 'idle', wait: 1 + Math.random()*6, nextAct: 0 });
   }
+  refreshCount();
 }
 function npcFreeCushion(n){
   const free = CUSHIONS.filter(c => !cushionTaken(c, n))
