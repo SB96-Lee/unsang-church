@@ -358,67 +358,37 @@ const sky = new THREE.Mesh(new THREE.SphereGeometry(300, 32, 16), new THREE.Shad
       float h = vP.y;
       vec3 top = vec3(0.30, 0.50, 0.82), mid = vec3(0.74, 0.85, 0.96), low = vec3(0.98, 0.95, 0.92), hor = vec3(1.0, 0.86, 0.68);
       vec3 c = h > 0.0 ? mix(mid, top, smoothstep(0.0, 0.65, h)) : mix(mid, low, smoothstep(0.0, -0.3, h));
-      float sun = pow(max(dot(vP, normalize(vec3(0.0, 0.23, -1.0))), 0.0), 6.0);
+      float sun = pow(max(dot(vP, normalize(vec3(0.0, 0.3, -1.0))), 0.0), 6.0);
       c = mix(c, hor, exp(-abs(h) * 8.0) * 0.6 + sun * 0.5);
       gl_FragColor = vec4(c, 1.0);
     }`
 }));
 scene.add(sky);
-const sunGlow = sprite(glowTex('rgba(255,252,238,1)', 'rgba(255,214,150,.5)'), 70, 70, .55);
-sunGlow.material.fog = false; sunGlow.position.set(0, 55, -240); sunGlow.renderOrder = -2; scene.add(sunGlow);
-// 하늘의 예수님: 해를 후광 삼아 두 팔을 벌려 품어 주시는 모습 (빛으로 그린 그림)
-const embraceTex = canvasTex(1024, 1024, (g, w, h) => {
-  const cx = w/2;
-  const draw = (tint) => {
-    const F = c => tint || c;
-    // 겉옷 (넓게 퍼지는 흰 옷)
-    g.fillStyle = F('#f8eedb');
-    g.beginPath(); g.moveTo(cx - 70, 360); g.lineTo(cx + 70, 360); g.quadraticCurveTo(cx + 150, 700, cx + 230, 1024); g.lineTo(cx - 230, 1024); g.quadraticCurveTo(cx - 150, 700, cx - 70, 360); g.fill();
-    // 어깨에서 늘어진 푸른 겉옷 자락
-    g.fillStyle = F('rgba(120,160,215,.75)');
-    g.beginPath(); g.moveTo(cx - 80, 370); g.quadraticCurveTo(cx - 20, 520, cx + 70, 370); g.quadraticCurveTo(cx + 120, 620, cx + 60, 1024); g.lineTo(cx - 200, 1024); g.quadraticCurveTo(cx - 140, 640, cx - 80, 370); g.fill();
-    // 팔과 넓은 소매 (양옆으로 벌려 안아 주시는 모습)
-    for (const s of [-1, 1]) {
-      g.fillStyle = F('#f8eedb');
-      g.beginPath();
-      g.moveTo(cx + s*60, 370);
-      g.quadraticCurveTo(cx + s*230, 330, cx + s*380, 300);
-      g.lineTo(cx + s*395, 340);
-      g.quadraticCurveTo(cx + s*300, 470, cx + s*190, 520);
-      g.quadraticCurveTo(cx + s*120, 470, cx + s*70, 450);
-      g.closePath(); g.fill();
-      // 손 (손바닥을 펴서 맞이하는 손)
-      g.fillStyle = F('#f2d4b4');
-      g.beginPath(); g.ellipse(cx + s*412, 312, 26, 34, s*-0.5, 0, Math.PI*2); g.fill();
-    }
-    // 머리카락과 수염
-    g.fillStyle = F('#8a6a4a');
-    g.beginPath(); g.ellipse(cx, 262, 78, 92, 0, Math.PI, 0); g.lineTo(cx + 80, 380); g.quadraticCurveTo(cx, 360, cx - 80, 380); g.closePath(); g.fill();
-    // 얼굴
-    g.fillStyle = F('#f2d4b4'); g.beginPath(); g.ellipse(cx, 262, 54, 66, 0, 0, Math.PI*2); g.fill();
-    g.fillStyle = F('#8a6a4a'); g.beginPath(); g.ellipse(cx, 312, 46, 40, 0, 0, Math.PI); g.fill();
-    // 온화하게 감은 눈과 미소
-    if (tint) return;
-    g.strokeStyle = 'rgba(110,80,55,.8)'; g.lineWidth = 4; g.lineCap = 'round';
-    for (const s of [-1, 1]) { g.beginPath(); g.arc(cx + s*22, 252, 11, 0.15*Math.PI, 0.85*Math.PI); g.stroke(); }
-    g.beginPath(); g.arc(cx, 290, 14, 0.2*Math.PI, 0.8*Math.PI); g.stroke();
-  };
-  // 후광
-  const halo = g.createRadialGradient(cx, 250, 40, cx, 250, 260);
-  halo.addColorStop(0, 'rgba(255,248,220,1)'); halo.addColorStop(.45, 'rgba(255,226,160,.6)'); halo.addColorStop(1, 'rgba(255,220,150,0)');
-  g.fillStyle = halo; g.fillRect(0, 0, w, h);
-  // 번진 빛 → 또렷한 모습 순서로 겹쳐 그려 은은하게
-  g.save(); g.filter = 'blur(24px)'; g.globalAlpha = .95; draw('rgb(222,178,96)'); g.restore();
-  g.save(); g.filter = 'blur(3px)'; draw(); g.restore();
-  // 아래쪽은 구름 속으로 사라짐
+const sunGlow = sprite(glowTex('rgba(255,252,238,1)', 'rgba(255,214,150,.5)'), 70, 70, .35);
+sunGlow.material.fog = false; sunGlow.position.set(0, 72, -240); sunGlow.renderOrder = -2; scene.add(sunGlow);
+// 하늘의 예수님: 천사들 가운데 두 팔을 벌리신 그림 (sky-jesus.jpg), 가장자리는 하늘에 녹아들게
+const embraceMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, fog: false, toneMapped: false });
+const embrace = new THREE.Mesh(new THREE.PlaneGeometry(170, 150), embraceMat);
+embrace.position.set(0, 16.5, -200); scene.add(embrace);
+const skyImg = new Image();
+skyImg.onload = () => {
+  const c = document.createElement('canvas'); c.width = skyImg.width; c.height = skyImg.height;
+  const g = c.getContext('2d');
+  g.drawImage(skyImg, 0, 0);
+  // 네 가장자리와 모서리를 부드럽게 지워 하늘에 녹아들게
   g.globalCompositeOperation = 'destination-in';
-  const fade = g.createLinearGradient(0, 0, 0, h);
-  fade.addColorStop(0, 'rgba(0,0,0,1)'); fade.addColorStop(.55, 'rgba(0,0,0,.95)'); fade.addColorStop(.92, 'rgba(0,0,0,0)');
-  g.fillStyle = fade; g.fillRect(0, 0, w, h);
+  const edge = (x0, y0, x1, y1, stops) => {
+    const lg = g.createLinearGradient(x0, y0, x1, y1);
+    stops.forEach(([o, a]) => lg.addColorStop(o, `rgba(0,0,0,${a})`));
+    g.fillStyle = lg; g.fillRect(0, 0, c.width, c.height);
+  };
+  edge(0, 0, 0, c.height, [[0, 0], [0.22, 1], [0.62, 1], [1, 0]]);
+  edge(0, 0, c.width, 0, [[0, 0], [0.18, 1], [0.82, 1], [1, 0]]);
   g.globalCompositeOperation = 'source-over';
-});
-const embrace = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshBasicMaterial({ map: embraceTex, transparent: true, opacity: .95, depthWrite: false, fog: false, toneMapped: false }));
-embrace.position.set(0, 12, -200); scene.add(embrace);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4;
+  embraceMat.map = t; embraceMat.opacity = 1; embraceMat.needsUpdate = true;
+};
+skyImg.src = 'sky-jesus.jpg';
 
 
 // 구름 바다
