@@ -76,7 +76,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .bottom{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .bottom > *{pointer-events:auto}
 #toasts{display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none}
-.toast{font-size:13px;padding:7px 14px;border-radius:999px;background:rgba(30,22,14,.62);color:#fbf3e4;animation:rise .35s ease-out}
+.toast{font-size:14px;padding:10px 20px;border-radius:999px;background:rgba(24,18,12,.72);border:1px solid rgba(255,244,220,.45);color:#fbf3e4;box-shadow:0 6px 20px rgba(0,0,0,.25);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:rise .35s ease-out}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .actions{display:flex;gap:4px;padding:6px}
 .act{border:0;background:transparent;border-radius:16px;width:76px;padding:8px 0 6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12.5px}
@@ -750,6 +750,7 @@ function presenceObj(){
     seat: me.seat, pray: me.pray, candle: myCandle, act: myAct, actT: myActT };
 }
 let myAct = '', myActT = 0;
+const ACT_MSG = { pray: '기도를 시작했어요', amen: '아멘으로 화답했어요', hallel: '할렐루야로 찬양했어요', candle: '촛불을 켰어요' };
 function pushPresence(){
   if (!room) return;
   const now = performance.now();
@@ -779,10 +780,9 @@ function applyPeer(p){
   const actT = Number(pr.actT) || 0;
   if (actT && actT !== o.lastActT) {
     o.lastActT = actT;
-    if (pr.act === 'amen') { o.av.nodT = clock.elapsedTime; showBubble(o, '아멘'); toast(`${o.nick}님이 아멘으로 화답했어요`); }
-    else if (pr.act === 'hallel') { o.av.cheerT = clock.elapsedTime; showBubble(o, '할렐루야'); toast(`${o.nick}님이 할렐루야로 찬양했어요`); }
-    else if (pr.act === 'pray') toast(`${o.nick}님이 기도를 시작했어요`);
-    else if (pr.act === 'candle') toast(`${o.nick}님이 촛불을 켰어요`);
+    if (pr.act === 'amen') { o.av.nodT = clock.elapsedTime; showBubble(o, '아멘'); }
+    else if (pr.act === 'hallel') { o.av.cheerT = clock.elapsedTime; showBubble(o, '할렐루야'); }
+    if (ACT_MSG[pr.act]) toast(`${o.nick}님이 ${ACT_MSG[pr.act]}`);
   }
 }
 function removePeer(id){
@@ -863,7 +863,7 @@ function setPray(on){
   if (me.pray === on) return;
   me.pray = on;
   $('#prayBtn').setAttribute('aria-pressed', on);
-  if (on) { target = null; myAct = 'pray'; myActT = Date.now(); toast('조용히 기도를 시작했어요'); }
+  if (on) { target = null; myAct = 'pray'; myActT = Date.now(); toast(`${myNick}님이 ${ACT_MSG.pray}`); }
   pushPresence();
 }
 // 기도: 앉아 있으면 바로, 아니면 가장 가까운 빈 방석으로 가서 앉은 뒤 시작
@@ -879,17 +879,17 @@ $('#prayBtn').onclick = () => {
   toast('가까운 방석으로 가는 중이에요');
 };
 $('#amenBtn').onclick = () => {
-  me.nodT = clock.elapsedTime; myAct = 'amen'; myActT = Date.now();
+  me.nodT = clock.elapsedTime; myAct = 'amen'; myActT = Date.now(); toast(`${myNick}님이 ${ACT_MSG.amen}`);
   showBubble(selfBubbleHost, '아멘'); pushPresence();
 };
 $('#hallelBtn').onclick = () => {
-  me.cheerT = clock.elapsedTime; myAct = 'hallel'; myActT = Date.now();
+  me.cheerT = clock.elapsedTime; myAct = 'hallel'; myActT = Date.now(); toast(`${myNick}님이 ${ACT_MSG.hallel}`);
   showBubble(selfBubbleHost, '할렐루야'); pushPresence();
 };
 $('#candleBtn').onclick = () => {
   myCandle = !myCandle;
   $('#candleBtn').setAttribute('aria-pressed', myCandle);
-  if (myCandle) { myAct = 'candle'; myActT = Date.now(); toast('촛대에 촛불을 하나 켰어요'); }
+  if (myCandle) { myAct = 'candle'; myActT = Date.now(); toast(`${myNick}님이 ${ACT_MSG.candle}`); }
   else toast('촛불을 껐어요');
   refreshCandles(); pushPresence();
 };
