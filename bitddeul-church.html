@@ -743,7 +743,7 @@ function presenceObj(){
     seat: me.seat, pray: me.pray, candle: myCandle, act: myAct, actT: myActT };
 }
 let myAct = '', myActT = 0;
-const ACT_MSG = { pray: '기도를 시작했어요', amen: '아멘으로 화답했어요', hallel: '할렐루야로 찬양했어요', candle: '촛불을 켰어요' };
+const ACT_MSG = { pray: '기도를 시작했어요', amen: '아멘으로 화답했어요', hallel: '할렐루야로 찬양했어요', candle: '촛불을 켰어요', candleOff: '촛불을 껐어요' };
 function pushPresence(){
   if (!room) return;
   const now = performance.now();
@@ -882,8 +882,8 @@ $('#hallelBtn').onclick = () => {
 $('#candleBtn').onclick = () => {
   myCandle = !myCandle;
   $('#candleBtn').setAttribute('aria-pressed', myCandle);
-  if (myCandle) { myAct = 'candle'; myActT = Date.now(); toast(`${myNick}님이 ${ACT_MSG.candle}`); }
-  else toast('촛불을 껐어요');
+  myAct = myCandle ? 'candle' : 'candleOff'; myActT = Date.now();
+  toast(`${myNick}님이 ${ACT_MSG[myAct]}`);
   refreshCandles(); pushPresence();
 };
 function refreshCandles(){
