@@ -830,8 +830,13 @@ function goToCushion(c){
   seatTarget = c; target = new THREE.Vector3(c.x, 0, c.z);
 }
 // 다른 사람이 앉아 있지 않은 방석 중 가장 가까운 곳
+function cushionTaken(c, self){
+  return [...others.values()].some(o => o.av.seat && Math.hypot(o.tx - c.x, o.tz - c.z) < 0.5)
+    || npcs.some(n => n !== self && n.cushion === c)
+    || (self && (seatTarget === c || (me.seat && Math.hypot(me.pos.x - c.x, me.pos.z - c.z) < 0.5)));
+}
 function nearestFreeCushion(){
-  const taken = c => [...others.values()].some(o => o.av.seat && Math.hypot(o.tx - c.x, o.tz - c.z) < 0.5);
+  const taken = c => cushionTaken(c, null);
   let best = null, bd = Infinity;
   for (const c of CUSHIONS) {
     const d = Math.hypot(c.x - me.pos.x, c.z - me.pos.z);
@@ -1185,6 +1190,68 @@ $('#hymnBtn').onclick = () => setHymn(!audio);
 $('#hymnOn').onclick = () => setHymn(true);
 $('#hymnOff').onclick = () => setHymn(false);
 
+// ---------- 함께 기도하는 이웃 (이 화면에만 보이는 캐릭터 4명) ----------
+// 걸어 다니다 빈 방석에 앉아 기도하고, 가끔 아멘·할렐루야·주여 삼창을 함. 접속자 수에는 넣지 않음
+const npcs = [];
+{
+  const used = new Set([myNick]);
+  for (let i = 0; i < 4; i++) {
+    let nick; do nick = randNick(); while (used.has(nick)); used.add(nick);
+    const av = makeAvatar(Math.random()*360|0);
+    av.pos.set((Math.random() - 0.5)*14, 0, -10 + Math.random()*26); av.ry = Math.PI;
+    const label = document.createElement('div'); label.className = 'label'; label.textContent = nick; $('#labels').appendChild(label);
+    npcs.push({ av, nick, label, bubble: null, goal: null, cushion: null, mode: 'idle', wait: 1 + Math.random()*6, nextAct: 0 });
+  }
+}
+function npcFreeCushion(n){
+  const free = CUSHIONS.filter(c => !cushionTaken(c, n))
+    .sort((a, b) => Math.hypot(a.x - n.av.pos.x, a.z - n.av.pos.z) - Math.hypot(b.x - n.av.pos.x, b.z - n.av.pos.z));
+  return free[Math.random()*Math.min(8, free.length)|0] || null;
+}
+function npcSay(n, act){
+  const a = n.av, t = clock.elapsedTime;
+  if (act === 'amen') { a.nodT = t; showBubble(n, '아멘'); }
+  else if (act === 'hallel') { a.cheerT = t; showBubble(n, '할렐루야'); }
+  else if (act === 'juyeo') juyeo(n, a);
+  toast(`${n.nick}님이 ${ACT_MSG[act]}`);
+}
+function updateNpcs(dt, t){
+  for (const n of npcs) {
+    const a = n.av;
+    a.moving = false;
+    if (n.goal) {
+      const dx = n.goal.x - a.pos.x, dz = n.goal.z - a.pos.z, d = Math.hypot(dx, dz);
+      if (d < 0.05) {
+        a.pos.x = n.goal.x; a.pos.z = n.goal.z; n.goal = null;
+        if (n.mode === 'toCushion') { a.seat = true; a.ry = Math.PI; n.mode = 'sit'; n.wait = 1.5 + Math.random()*2; }
+        else { n.mode = 'idle'; n.wait = 2 + Math.random()*5; }
+      } else {
+        const step = Math.min(d, 1.7*dt);
+        a.pos.x += dx/d*step; a.pos.z += dz/d*step;
+        a.ry = angLerp(a.ry, Math.atan2(dx, dz), Math.min(1, dt*8)); a.moving = true;
+      }
+    } else if ((n.wait -= dt) <= 0) {
+      if (n.mode === 'idle') {
+        const c = Math.random() < 0.65 ? npcFreeCushion(n) : null;
+        if (c) { n.cushion = c; n.goal = c; n.mode = 'toCushion'; }
+        else { n.goal = { x: (Math.random() - 0.5)*18, z: -14 + Math.random()*36 }; n.mode = 'stroll'; }
+      } else if (n.mode === 'sit') {
+        a.pray = true; n.mode = 'pray'; n.wait = 30 + Math.random()*40; n.nextAct = 12 + Math.random()*20;
+        toast(`${n.nick}님이 ${ACT_MSG.pray}`);
+      } else if (n.mode === 'pray') {
+        a.pray = false; a.seat = false; n.cushion = null; n.mode = 'idle'; n.wait = 1 + Math.random()*2;
+      }
+    }
+    if (n.mode === 'pray' && (n.nextAct -= dt) <= 0) {
+      const r = Math.random();
+      npcSay(n, r < 0.5 ? 'amen' : r < 0.8 ? 'hallel' : 'juyeo');
+      n.nextAct = 25 + Math.random()*30;
+    }
+    a.pos.y = a.seat ? CUSHION_TOP : groundY(a.pos.x, a.pos.z);
+    animateAvatar(a, dt, t);
+  }
+}
+
 // ---------- 이름표 ----------
 const meLabel = document.createElement('div'); meLabel.className = 'label me'; meLabel.textContent = myNick + ' (나)';
 $('#labels').appendChild(meLabel);
@@ -1240,6 +1307,7 @@ function frame(){
   }
   me.pos.y = me.seat ? CUSHION_TOP : groundY(me.pos.x, me.pos.z);
   animateAvatar(me, dt, t);
+  updateNpcs(dt, t);
   // 다른 사람
   for (const o of others.values()) {
     const a = o.av, k = Math.min(1, dt*8);
@@ -1269,8 +1337,8 @@ function frame(){
   renderer.render(scene, camera);
   // 이름표
   place(meLabel, me.pos, me.seat ? 1.6 : 1.75);
-  for (const o of others.values()) place(o.label, o.av.pos, o.av.seat ? 1.6 : 1.75);
-  for (const h of [selfBubbleHost, ...others.values()]) {
+  for (const o of [...others.values(), ...npcs]) place(o.label, o.av.pos, o.av.seat ? 1.6 : 1.75);
+  for (const h of [selfBubbleHost, ...others.values(), ...npcs]) {
     if (!h.bubble) continue;
     const age = t - h.bubble.t0;
     if (age > 2) { h.bubble.el.remove(); h.bubble = null; continue; }
