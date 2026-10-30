@@ -133,7 +133,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
 <div class="bottom">
   <div id="toasts" aria-live="polite"></div>
-  <div class="hint">WASD 또는 바닥을 눌러 걷기 · 의자를 눌러 앉기 · 드래그로 둘러보기 · 휠로 확대</div>
+  <div class="hint">WASD 또는 바닥을 눌러 걷기 · 방석을 눌러 앉기 · 기도를 누르면 가까운 방석에 앉아 기도 · 드래그로 둘러보기</div>
   <nav class="actions chip" aria-label="예배당에서 할 일">
     <button class="act" id="prayBtn" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5c-1 2.6-1.6 5.6-1.6 8.6V20M12 3.5c1 2.6 1.6 5.6 1.6 8.6V20"/><path d="M10.4 13 7 16.4V20h3.4M13.6 13 17 16.4V20h-3.4"/></svg>
@@ -401,20 +401,20 @@ for (let i = 0; i < 60; i++) {
 const cloudSea = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), new THREE.MeshBasicMaterial({ color: 0xf7f0e8 }));
 cloudSea.rotation.x = -Math.PI/2; cloudSea.position.y = -8; scene.add(cloudSea);
 
-// 장의자
-const pewWood = std(0x8a5a32, { roughness: .55 });
-const pickables = [floor, carpet, platform];
-const PEW_Z = [];
-for (let i = 0; i < 12; i++) PEW_Z.push(-14 + i*2.3);
-for (const z of PEW_Z) for (const [x0, x1] of [[-6.9, -1.6], [1.6, 6.9]]) {
-  const len = x1 - x0, cx = (x0 + x1)/2;
-  const info = { x0, x1, z };
-  const seat = box(len, 0.08, 0.5, pewWood, cx, 0.45, z, scene); seat.userData.pew = info;
-  const back = box(len, 0.75, 0.07, pewWood, cx, 0.88, z + 0.27, scene); back.userData.pew = info;
-  box(len, 0.05, 0.12, pewWood, cx, 1.27, z + 0.25, scene);
-  for (const ex of [x0 + 0.04, x1 - 0.04]) box(0.08, 1.0, 0.62, pewWood, ex, 0.5, z + 0.03, scene);
-  pickables.push(seat, back);
-}
+// 기도 방석 (통로 양쪽 바닥에 줄지어 놓임)
+const CUSHION_TOP = 0.12;
+const CUSHIONS = [];
+for (let z = -14; z <= 12.5; z += 1.75) for (const s of [-1, 1]) for (let c = 0; c < 5; c++) CUSHIONS.push({ x: s*(2.0 + c*1.3), z });
+const cushionMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.86, CUSHION_TOP, 0.86), std(0x34497a, { roughness: .95 }), CUSHIONS.length);
+const pipingMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.94, 0.05, 0.94), gold, CUSHIONS.length);
+CUSHIONS.forEach((c, i) => {
+  mtx.makeTranslation(c.x, CUSHION_TOP/2 + 0.01, c.z); cushionMesh.setMatrixAt(i, mtx);
+  mtx.makeTranslation(c.x, 0.025, c.z); pipingMesh.setMatrixAt(i, mtx);
+});
+cushionMesh.castShadow = cushionMesh.receiveShadow = true; pipingMesh.receiveShadow = true;
+cushionMesh.userData.cushions = true;
+scene.add(cushionMesh, pipingMesh);
+const pickables = [floor, carpet, platform, cushionMesh];
 
 // 금빛 등대
 for (const z of [-12, -1, 10, 21]) for (const x of [-8.6, 8.6]) {
@@ -598,23 +598,23 @@ function animateAvatar(a, dt, t){
   const sw = a.moving ? Math.sin(a.walk) : 0;
   a.prayW += ((a.pray ? 1 : 0) - a.prayW) * Math.min(1, dt*6);
   const p = a.prayW;
-  a.body.position.y = (a.seat ? 0.2 : 0) + (a.moving ? Math.abs(Math.sin(a.walk))*0.04 : Math.sin(t*1.6)*0.006);
-  a.body.scale.y = a.seat ? 0.82 : 1;
+  a.body.position.y = a.moving ? Math.abs(Math.sin(a.walk))*0.04 : Math.sin(t*1.6)*0.006;
+  a.body.scale.set(a.seat ? 1.14 : 1, a.seat ? 0.74 : 1, a.seat ? 1.14 : 1);
   for (const { pivot, s } of a.arms) {
     pivot.rotation.set(sw*0.45*s*(1 - p) + p*-1.15, 0, (s*0.12)*(1 - p) + p*(-s*0.5));
   }
-  a.feet[0].position.z = 0.16 + sw*0.07; a.feet[1].position.z = 0.16 - sw*0.07;
+  a.feet[0].position.z = a.seat ? 0.3 : 0.16 + sw*0.07; a.feet[1].position.z = a.seat ? 0.3 : 0.16 - sw*0.07;
   const nod = t - a.nodT < 1.2 ? Math.sin((t - a.nodT)/1.2*Math.PI*2) * 0.35 * Math.max(0, 1 - (t - a.nodT)/1.2) + Math.sin((t - a.nodT)/1.2*Math.PI)*0.2 : 0;
   a.head.rotation.x = p*0.3 + nod;
   a.halo.material.opacity = p * (0.5 + Math.sin(t*2.2)*0.18);
-  a.halo.position.y = 1.55 + Math.sin(t*1.5)*0.03;
+  a.halo.position.y = (a.seat ? 1.2 : 1.55) + Math.sin(t*1.5)*0.03;
 }
 
 // ---------- 내 캐릭터 ----------
 const me = makeAvatar(myHue);
 me.pos.set((Math.random() - 0.5)*1.2, 0, 19 + Math.random()*2);
 me.ry = Math.PI;
-let target = null, seatTarget = null, myCandle = false;
+let target = null, seatTarget = null, myCandle = false, prayOnArrive = false;
 
 const groundY = (x, z) => (z < PLATFORM_Z && Math.abs(x) < DAIS_W/2) ? DAIS_H : 0;
 const clampPos = v => { v.x = clamp(v.x, -W/2 + 0.8, W/2 - 0.8); v.z = clamp(v.z, -L/2 + 0.8, L/2 - 0.8); return v; };
@@ -658,20 +658,31 @@ canvas.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); canvas
 canvas.addEventListener('wheel', e => { e.preventDefault(); dist = clamp(dist * (1 + e.deltaY*0.001), 2.2, 16); }, { passive: false });
 
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function goToCushion(c){
+  seatTarget = c; target = new THREE.Vector3(c.x, 0, c.z);
+}
+// 다른 사람이 앉아 있지 않은 방석 중 가장 가까운 곳
+function nearestFreeCushion(){
+  const taken = c => [...others.values()].some(o => o.av.seat && Math.hypot(o.tx - c.x, o.tz - c.z) < 0.5);
+  let best = null, bd = Infinity;
+  for (const c of CUSHIONS) {
+    const d = Math.hypot(c.x - me.pos.x, c.z - me.pos.z);
+    if (d < bd && !taken(c)) { bd = d; best = c; }
+  }
+  return best;
+}
 function pick(cx, cy){
   ndc.set(cx/innerWidth*2 - 1, -(cy/innerHeight)*2 + 1);
   ray.setFromCamera(ndc, camera);
   const hit = ray.intersectObjects(pickables, false)[0];
   if (!hit) return;
-  const pew = hit.object.userData.pew;
-  if (pew) {
-    seatTarget = { x: clamp(hit.point.x, pew.x0 + 0.35, pew.x1 - 0.35), z: pew.z };
-    target = new THREE.Vector3(seatTarget.x, 0, seatTarget.z);
-  } else {
+  prayOnArrive = false;
+  if (hit.object.userData.cushions && hit.instanceId != null) goToCushion(CUSHIONS[hit.instanceId]);
+  else {
     seatTarget = null;
     target = clampPos(new THREE.Vector3(hit.point.x, 0, hit.point.z));
   }
-  me.seat = false; setPray(false);
+  me.seat = false; setPray(false); $('#prayBtn').setAttribute('aria-pressed', false);
   marker.position.set(target.x, groundY(target.x, target.z) + 0.02, target.z); markerT = 0;
   pushPresence();
 }
@@ -800,7 +811,18 @@ function setPray(on){
   if (on) { target = null; myAct = 'pray'; myActT = Date.now(); toast('조용히 기도를 시작했어요'); }
   pushPresence();
 }
-$('#prayBtn').onclick = () => setPray(!me.pray);
+// 기도: 앉아 있으면 바로, 아니면 가장 가까운 빈 방석으로 가서 앉은 뒤 시작
+$('#prayBtn').onclick = () => {
+  if (me.pray) { setPray(false); return; }
+  if (me.seat) { setPray(true); return; }
+  if (prayOnArrive) { prayOnArrive = false; target = null; seatTarget = null; $('#prayBtn').setAttribute('aria-pressed', false); return; }
+  const c = nearestFreeCushion();
+  if (!c) { setPray(true); return; }
+  goToCushion(c); prayOnArrive = true;
+  $('#prayBtn').setAttribute('aria-pressed', true);
+  marker.position.set(c.x, CUSHION_TOP + 0.02, c.z); markerT = 0;
+  toast('가까운 방석으로 가는 중이에요');
+};
 $('#amenBtn').onclick = () => {
   me.nodT = clock.elapsedTime; myAct = 'amen'; myActT = Date.now();
   showBubble(selfBubbleHost, '아멘'); pushPresence();
@@ -947,7 +969,7 @@ function frame(){
   const kf = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
   const kr = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
   if (kf || kr) {
-    target = null; seatTarget = null; me.seat = false; if (me.pray) setPray(false);
+    target = null; seatTarget = null; if (prayOnArrive) $('#prayBtn').setAttribute('aria-pressed', false); prayOnArrive = false; me.seat = false; if (me.pray) setPray(false);
     let mx = -Math.sin(yaw)*kf + Math.cos(yaw)*kr, mz = -Math.cos(yaw)*kf - Math.sin(yaw)*kr;
     const ml = Math.hypot(mx, mz); mx /= ml; mz /= ml;
     me.pos.x += mx*3.0*dt; me.pos.z += mz*3.0*dt; clampPos(me.pos);
@@ -957,7 +979,7 @@ function frame(){
     const dx = target.x - me.pos.x, dz = target.z - me.pos.z, d = Math.hypot(dx, dz);
     if (d < 0.05) {
       me.pos.x = target.x; me.pos.z = target.z; target = null;
-      if (seatTarget) { me.seat = true; me.ry = Math.PI; seatTarget = null; }
+      if (seatTarget) { me.seat = true; me.ry = Math.PI; seatTarget = null; if (prayOnArrive) { prayOnArrive = false; setPray(true); } }
       pushPresence();
     } else {
       const step = Math.min(d, 3.0*dt);
@@ -967,7 +989,7 @@ function frame(){
       pushPresence();
     }
   }
-  me.pos.y = me.seat ? 0 : groundY(me.pos.x, me.pos.z);
+  me.pos.y = me.seat ? CUSHION_TOP : groundY(me.pos.x, me.pos.z);
   animateAvatar(me, dt, t);
   // 다른 사람
   for (const o of others.values()) {
@@ -975,7 +997,7 @@ function frame(){
     const dx = o.tx - a.pos.x, dz = o.tz - a.pos.z;
     a.moving = Math.hypot(dx, dz) > 0.03;
     a.pos.x += dx*k; a.pos.z += dz*k;
-    a.pos.y = a.seat ? 0 : groundY(a.pos.x, a.pos.z);
+    a.pos.y = a.seat ? CUSHION_TOP : groundY(a.pos.x, a.pos.z);
     a.ry = angLerp(a.ry, o.try, k);
     animateAvatar(a, dt, t);
   }
@@ -995,8 +1017,8 @@ function frame(){
   markerT += dt; marker.material.opacity = Math.max(0, 0.9 - markerT*1.2); marker.scale.setScalar(1 + markerT*0.8);
   renderer.render(scene, camera);
   // 이름표
-  place(meLabel, me.pos, me.seat ? 1.95 : 1.75);
-  for (const o of others.values()) place(o.label, o.av.pos, o.av.seat ? 1.95 : 1.75);
+  place(meLabel, me.pos, me.seat ? 1.45 : 1.75);
+  for (const o of others.values()) place(o.label, o.av.pos, o.av.seat ? 1.45 : 1.75);
   for (const h of [selfBubbleHost, ...others.values()]) {
     if (!h.bubble) continue;
     const age = t - h.bubble.t0;
