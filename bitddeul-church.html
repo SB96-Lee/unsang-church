@@ -316,8 +316,9 @@ for (const s of [-1, 1]) {
   box(0.3, 0.12, L - 0.6, marble, s*(W/2 - 0.3), 0.86, 0);
 }
 
-// 기둥 열 (지붕 없이 하늘로 열림)
-function column(x, z, h = 9){
+// 기둥 열: 양옆은 트여 있고 위는 대리석 천장
+const HALL_H = 12, BACK_Z = -28.35;
+function column(x, z, h = HALL_H){
   box(1.3, 0.35, 1.3, marbleDark, x, 0.17, z);
   const shaft = cyl(0.42, 0.5, h - 0.8, marble, x, 0.35 + (h - 0.8)/2, z, scene, 24);
   box(1.3, 0.45, 1.3, marbleDark, x, h - 0.22, z);
@@ -328,8 +329,84 @@ const COL_Z = [];
 for (let z = -24; z <= 24; z += 6) COL_Z.push(z);
 for (const s of [-1, 1]) {
   COL_Z.forEach(z => column(s*16, z));
-  box(1.4, 0.7, COL_Z[COL_Z.length - 1] - COL_Z[0] + 1.3, marble, s*16, 9.35, 0);
-  box(1.45, 0.12, COL_Z[COL_Z.length - 1] - COL_Z[0] + 1.35, gold, s*16, 9.0, 0);
+  box(1.4, 0.7, COL_Z[COL_Z.length - 1] - BACK_Z + 0.65, marble, s*16, HALL_H + 0.35, (COL_Z[COL_Z.length - 1] + 0.65 + BACK_Z)/2);
+  box(1.45, 0.12, COL_Z[COL_Z.length - 1] - BACK_Z + 0.7, gold, s*16, HALL_H, (COL_Z[COL_Z.length - 1] + 0.65 + BACK_Z)/2);
+}
+
+// 대리석 천장: 기둥 줄마다 보가 지나가는 우물 천장
+const CEIL_Y = HALL_H + 0.7, CEIL_FRONT = COL_Z[COL_Z.length - 1] + 0.65;
+const ceilLen = CEIL_FRONT - BACK_Z, ceilZ = (CEIL_FRONT + BACK_Z)/2;
+const ceiling = box(33.4, 0.5, ceilLen, marble, 0, CEIL_Y + 0.25, ceilZ);
+ceiling.castShadow = false;
+for (const z of COL_Z) { const b = box(32, 0.55, 0.7, marbleDark, 0, CEIL_Y - 0.27, z); b.castShadow = false; }
+for (const x of [-5.4, 5.4]) { const b = box(0.7, 0.55, ceilLen, marbleDark, x, CEIL_Y - 0.27, ceilZ); b.castShadow = false; }
+for (const z of COL_Z) for (const x of [-5.4, 5.4]) { const r = cyl(0.42, 0.42, 0.08, gold, x, CEIL_Y - 0.58, z, scene, 20); r.castShadow = false; }
+
+// 십자가 뒤 벽과 큰 아치 창: 창으로 햇빛이 쏟아져 들어옴
+const WIN_HALF = 5, WIN_SILL = 1.2, WIN_SPRING = 7;
+const wallShape = new THREE.Shape();
+wallShape.moveTo(-16.7, 0); wallShape.lineTo(16.7, 0); wallShape.lineTo(16.7, CEIL_Y); wallShape.lineTo(-16.7, CEIL_Y); wallShape.lineTo(-16.7, 0);
+const winHole = new THREE.Path();
+winHole.moveTo(-WIN_HALF, WIN_SILL); winHole.lineTo(WIN_HALF, WIN_SILL); winHole.lineTo(WIN_HALF, WIN_SPRING);
+winHole.absarc(0, WIN_SPRING, WIN_HALF, 0, Math.PI, false); winHole.lineTo(-WIN_HALF, WIN_SILL);
+wallShape.holes.push(winHole);
+const backWall = new THREE.Mesh(new THREE.ExtrudeGeometry(wallShape, { depth: 0.6, bevelEnabled: false, curveSegments: 32 }), marble);
+backWall.position.z = BACK_Z; backWall.castShadow = backWall.receiveShadow = true; scene.add(backWall);
+const frameZ = BACK_Z + 0.68;
+const winArch = new THREE.Mesh(new THREE.TorusGeometry(WIN_HALF, 0.16, 10, 48, Math.PI), gold);
+winArch.position.set(0, WIN_SPRING, frameZ); scene.add(winArch);
+for (const sx of [-1, 1]) box(0.32, WIN_SPRING - WIN_SILL, 0.32, gold, sx*WIN_HALF, (WIN_SPRING + WIN_SILL)/2, frameZ);
+box(WIN_HALF*2 + 0.8, 0.3, 0.9, marbleDark, 0, WIN_SILL - 0.15, frameZ - 0.1);
+
+// 창으로 들어오는 빛줄기: 창에서 앞쪽 바닥으로 비스듬히 내려오는 빛 덩어리
+const SUN_DIR = new THREE.Vector3(0, -24, 66).normalize();
+const shaftGeo = (() => {
+  const near = [[-WIN_HALF, WIN_SILL], [WIN_HALF, WIN_SILL], [WIN_HALF, WIN_SPRING + WIN_HALF], [-WIN_HALF, WIN_SPRING + WIN_HALF]];
+  const LEN = 40, pos = [], t = [], u = [];
+  for (const end of [0, 1]) for (const [x, y] of near) {
+    pos.push(x + SUN_DIR.x*LEN*end, y + SUN_DIR.y*LEN*end, BACK_Z + 0.6 + SUN_DIR.z*LEN*end);
+    t.push(end); u.push((x + WIN_HALF)/(WIN_HALF*2));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('t', new THREE.Float32BufferAttribute(t, 1));
+  g.setAttribute('u', new THREE.Float32BufferAttribute(u, 1));
+  g.setIndex([0,1,5, 0,5,4, 1,2,6, 1,6,5, 2,3,7, 2,7,6, 3,0,4, 3,4,7]);
+  return g;
+})();
+const shaftMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+  uniforms: { time: { value: 0 } },
+  vertexShader: 'attribute float t; attribute float u; varying float vT; varying float vU; varying vec3 vW; void main(){ vT = t; vU = u; vW = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `uniform float time; varying float vT; varying float vU; varying vec3 vW;
+    void main(){
+      float streak = 0.55 + 0.45 * sin(vW.x * 2.3 + sin(vW.x * 0.7 + time * 0.25) * 2.0);
+      float fade = pow(1.0 - vT, 1.6) * smoothstep(0.0, 0.04, vT);
+      float edge = smoothstep(0.0, 0.18, vU) * smoothstep(1.0, 0.82, vU);
+      gl_FragColor = vec4(vec3(1.0, 0.93, 0.78) * streak * fade * edge * 0.22, 1.0);
+    }`
+});
+const sunShaft = new THREE.Mesh(shaftGeo, shaftMat); sunShaft.renderOrder = 2; scene.add(sunShaft);
+// 바닥에 떨어진 창 모양 햇빛 (십자가 그림자가 길게 드리움). 흰 대리석이라 그림자만으로는 잘 안 보여 따로 그림
+{
+  const k = -SUN_DIR.z/SUN_DIR.y, wallZ = BACK_Z + 0.6;      // 높이 1당 앞으로 나아가는 거리
+  const z0 = PLATFORM_Z + 0.1, z1 = wallZ + (WIN_SPRING + WIN_HALF)*k, zSpring = wallZ + WIN_SPRING*k;
+  const len = z1 - z0, Wc = 256, Hc = 1024, py = z => (z - z0)/len*Hc, px = x => (x/WIN_HALF + 1)/2*Wc;
+  const poolTex = canvasTex(Wc, Hc, (g) => {
+    if ('filter' in g) g.filter = 'blur(5px)';
+    const grad = g.createLinearGradient(0, 0, 0, Hc);
+    grad.addColorStop(0, 'rgba(255,236,196,1)'); grad.addColorStop(1, 'rgba(255,236,196,.45)');
+    g.fillStyle = grad;
+    g.beginPath(); g.moveTo(px(-WIN_HALF*.92), 0); g.lineTo(px(WIN_HALF*.92), 0); g.lineTo(px(WIN_HALF*.92), py(zSpring));
+    g.ellipse(Wc/2, py(zSpring), Wc/2*.92, py(z1) - py(zSpring) - 8, 0, 0, Math.PI); g.closePath(); g.fill();
+    g.globalCompositeOperation = 'destination-out'; g.fillStyle = '#000';
+    const cz = -25, cy0 = DAIS_H + 0.6, cy1 = DAIS_H + 10.1, bar = DAIS_H + 7.4;
+    g.fillRect(px(-0.4), py(cz + cy0*k), px(0.4) - px(-0.4), py(cz + cy1*k) - py(cz + cy0*k));
+    g.fillRect(px(-2.7), py(cz + (bar - 0.3)*k), px(2.7) - px(-2.7), py(cz + (bar + 0.3)*k) - py(cz + (bar - 0.3)*k));
+  });
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(WIN_HALF*2, len), new THREE.MeshBasicMaterial({
+    map: poolTex, transparent: true, opacity: .55, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+  pool.rotation.x = -Math.PI/2; pool.position.set(0, 0.014, (z0 + z1)/2); pool.renderOrder = 1; scene.add(pool);
 }
 
 // 입구 아치 문
@@ -573,11 +650,11 @@ const candleSlots = [];
 const standLight = new THREE.PointLight(0xffb060, 0, 5, 2); standLight.position.set(0, 1.5, 0.3); stand.add(standLight);
 
 // 조명
-scene.add(new THREE.HemisphereLight(0xe8f0ff, 0xf3e6cf, 0.85));
-const sun = new THREE.DirectionalLight(0xfff0d6, 1.05);
-sun.position.set(-26, 30, -14); sun.target.position.set(0, 0, 0);
+scene.add(new THREE.HemisphereLight(0xe8f0ff, 0xf3e6cf, 1.0));
+const sun = new THREE.DirectionalLight(0xfff0d6, 1.5);
+sun.target.position.set(0, 0, -6); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, -70);
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 36, bottom: -36, near: 1, far: 100 });
+Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 36, bottom: -36, near: 1, far: 150 });
 sun.shadow.bias = -0.0006;
 scene.add(sun, sun.target);
 const crossPoint = new THREE.PointLight(0xffd9a0, 1.0, 18, 2); crossPoint.position.set(0, 6, -22); scene.add(crossPoint);
@@ -627,7 +704,7 @@ function makeAvatar(hue){
   const halo = sprite(prayGlow, 0.9, 0.9, 0); halo.position.y = 1.55; root.add(halo);
   scene.add(root);
   return { root, body, head, arms, feet, halo, stoleMat,
-    pos: new THREE.Vector3(), ry: 0, walk: 0, moving: false, seat: false, pray: false, nodT: -9, cheerT: -9, prayW: 0 };
+    pos: new THREE.Vector3(), ry: 0, walk: 0, moving: false, seat: false, pray: false, nodT: -9, cheerT: -9, prayW: 0, phase: Math.random()*6 };
 }
 
 function animateAvatar(a, dt, t){
@@ -644,14 +721,19 @@ function animateAvatar(a, dt, t){
   for (const { pivot } of a.arms) pivot.scale.set(1/sx, 1/sy, 1/sx);
   const ct = t - a.cheerT; // 할렐루야 만세: 0.3초에 올리고, 손을 흔들다가 2초에 내림
   const c = ct >= 0 && ct < 2 ? Math.min(1, ct/0.3, (2 - ct)/0.4) : 0;
+  // 기도: 모은 손을 가슴께에서 천천히 올렸다 내리고, 가끔 간절히 더 들어 올림
+  const ph = t*1.5 + a.phase;
+  const lift = Math.pow(Math.max(0, Math.sin(ph*0.37)), 6);
+  const prx = -1.3 + Math.sin(ph)*0.08 - lift*0.3;
+  a.body.rotation.x = p*(0.05 + Math.sin(ph*0.5)*0.04 + lift*0.05)*(1 - c);
   for (const { pivot, s } of a.arms) {
-    const rx = sw*0.45*s*(1 - p) + p*-1.15, rz = (s*0.12)*(1 - p) + p*(-s*0.5);
+    const rx = sw*0.45*s*(1 - p) + p*prx, rz = (s*0.12)*(1 - p) + p*(-s*0.5);
     const up = s*(2.75 + Math.sin(ct*12)*0.12);
     pivot.rotation.set(rx*(1 - c), 0, rz*(1 - c) + up*c);
   }
   a.feet[0].position.z = a.seat ? 0.3 : 0.16 + sw*0.07; a.feet[1].position.z = a.seat ? 0.3 : 0.16 - sw*0.07;
   const nod = t - a.nodT < 1.2 ? Math.sin((t - a.nodT)/1.2*Math.PI*2) * 0.35 * Math.max(0, 1 - (t - a.nodT)/1.2) + Math.sin((t - a.nodT)/1.2*Math.PI)*0.2 : 0;
-  a.head.rotation.x = (p*0.3 + nod)*(1 - c) - c*0.15;
+  a.head.rotation.x = (p*(0.3 + Math.sin(ph*0.5 + 1)*0.08 - lift*0.12) + nod)*(1 - c) - c*0.15;
   if (c) a.body.position.y += Math.abs(Math.sin(ct*Math.PI*2))*0.05*c;
   a.halo.material.opacity = p * (0.5 + Math.sin(t*2.2)*0.18);
   a.halo.position.y = (a.seat ? 1.4 : 1.55) + Math.sin(t*1.5)*0.03;
@@ -1082,6 +1164,7 @@ addEventListener('resize', resize); resize();
 
 function frame(){
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  shaftMat.uniforms.time.value = t;
   // 내 이동: WASD는 카메라 기준 (W 앞, S 뒤, A 왼쪽, D 오른쪽)
   me.moving = false;
   const kf = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
@@ -1123,6 +1206,7 @@ function frame(){
   look.set(me.pos.x, me.pos.y + 1.35, me.pos.z);
   camPos.set(Math.sin(yaw)*Math.cos(pitch), Math.sin(pitch), Math.cos(yaw)*Math.cos(pitch)).multiplyScalar(dist).add(look);
   camPos.x = clamp(camPos.x, -W/2 - 1, W/2 + 1); camPos.z = clamp(camPos.z, -L/2 - 1, L/2 + 1); camPos.y = clamp(camPos.y, 0.4, 30);
+  if (Math.abs(camPos.x) < 17.5 && camPos.z < CEIL_FRONT + 0.5) camPos.y = Math.min(camPos.y, CEIL_Y - 1);
   if (camReady) camera.position.lerp(camPos, Math.min(1, dt*8)); else { camera.position.copy(camPos); camReady = true; }
   camera.lookAt(look);
   // 불꽃 흔들림
