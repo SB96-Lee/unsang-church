@@ -42,9 +42,18 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .tool:hover{background:var(--gold-soft)}
 .tool svg{width:18px;height:18px}
 .tool[aria-pressed="true"]{background:var(--gold);color:#fff}
+#hymnBtn .ico-on,#hymnBtn[aria-pressed="true"] .ico-off{display:none}
+#hymnBtn[aria-pressed="true"] .ico-on{display:block}
+.side{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.hymnSwitch{display:flex;gap:2px;padding:3px}
+.hymnSwitch button{border:0;background:transparent;border-radius:999px;padding:5px 11px;font-size:12px;display:flex;align-items:center;gap:5px}
+.hymnSwitch button svg{width:14px;height:14px}
+.hymnSwitch button:hover{background:var(--gold-soft)}
+.hymnSwitch button[aria-pressed="true"]{background:var(--gold);color:#fff}
+.hymnSwitch b{font-size:10.5px;letter-spacing:.04em}
 .count{font-variant-numeric:tabular-nums;font-weight:700}
 
-.panel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 70px);right:max(16px,env(safe-area-inset-right,0px));width:min(300px,calc(100vw - 32px));max-height:min(60vh,460px);overflow:auto;background:var(--paper-solid);border:1px solid var(--line);border-radius:18px;box-shadow:0 14px 40px rgba(20,12,4,.35);padding:16px}
+.panel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 106px);right:max(16px,env(safe-area-inset-right,0px));width:min(300px,calc(100vw - 32px));max-height:min(60vh,460px);overflow:auto;background:var(--paper-solid);border:1px solid var(--line);border-radius:18px;box-shadow:0 14px 40px rgba(20,12,4,.35);padding:16px}
 .panel h2{font-family:var(--display);font-size:16px;margin:0 0 4px;text-wrap:balance}
 .panel p{margin:0 0 12px;color:var(--muted);font-size:12.5px;line-height:1.55}
 .panel ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
@@ -79,7 +88,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 @media (max-width:520px){
   .brand small{display:none}
   .tool .tlabel{display:none}
-  .act{width:68px}
+  .act{width:60px;font-size:12px}
 }
 @media (prefers-reduced-motion:reduce){.toast{animation:none}}
 </style>
@@ -92,19 +101,26 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
     <svg viewBox="0 0 26 26" aria-hidden="true"><rect x="11" y="3" width="4" height="20" rx="1" fill="#a8762a"/><rect x="5" y="8" width="16" height="4" rx="1" fill="#a8762a"/></svg>
     <div><b>운상</b><small>구름 위 온라인 교회</small></div>
   </div>
+  <div class="side">
   <div class="tools chip" role="toolbar" aria-label="예배당 도구">
     <button class="tool" id="peopleBtn" aria-expanded="false" aria-controls="peoplePanel" title="함께 있는 사람">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.8 14.2c2.3.2 4 1.8 4.6 4.8"/></svg>
       <span class="count" id="count">1</span>
     </button>
     <button class="tool" id="hymnBtn" aria-pressed="false" title="찬송 듣기">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>
+      <svg class="ico-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+      <svg class="ico-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
       <span class="tlabel">찬송</span>
     </button>
     <button class="tool" id="meBtn" aria-expanded="false" aria-controls="mePanel" title="내 이름 바꾸기">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.8 3.6-6 7-6s6.2 2.2 7 6"/></svg>
       <span class="tlabel">내 이름</span>
     </button>
+  </div>
+  <div class="hymnSwitch chip" role="group" aria-label="찬송 켜고 끄기">
+    <button id="hymnOn" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>찬송 듣기 <b>ON</b></button>
+    <button id="hymnOff" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>찬송 끄기 <b>OFF</b></button>
+  </div>
   </div>
 </div>
 
@@ -135,6 +151,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
     <button class="act" id="amenBtn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 4v4M5.6 6.6l2.8 2.8M18.4 6.6l-2.8 2.8M4 13h4M16 13h4"/><path d="M8 18a4 4 0 0 1 8 0"/></svg>
       아멘
+    </button>
+    <button class="act" id="hallelBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="2.3"/><path d="M12 11v6M9 21l3-4 3 4"/><path d="M12 12.5 7.5 9 5 3.5M12 12.5 16.5 9 19 3.5"/></svg>
+      할렐루야
     </button>
     <button class="act" id="candleBtn" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3c1.6 1.8 2.2 3 2.2 4.2A2.2 2.2 0 0 1 12 9.4a2.2 2.2 0 0 1-2.2-2.2C9.8 6 10.4 4.8 12 3Z"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
@@ -720,6 +740,7 @@ function applyPeer(p){
   if (actT && actT !== o.lastActT) {
     o.lastActT = actT;
     if (pr.act === 'amen') { o.av.nodT = clock.elapsedTime; showBubble(o, '아멘'); toast(`${o.nick}님이 아멘으로 화답했어요`); }
+    else if (pr.act === 'hallel') { o.av.nodT = clock.elapsedTime; showBubble(o, '할렐루야'); toast(`${o.nick}님이 할렐루야로 찬양했어요`); }
     else if (pr.act === 'pray') toast(`${o.nick}님이 기도를 시작했어요`);
     else if (pr.act === 'candle') toast(`${o.nick}님이 촛불을 켰어요`);
   }
@@ -820,6 +841,10 @@ $('#prayBtn').onclick = () => {
 $('#amenBtn').onclick = () => {
   me.nodT = clock.elapsedTime; myAct = 'amen'; myActT = Date.now();
   showBubble(selfBubbleHost, '아멘'); pushPresence();
+};
+$('#hallelBtn').onclick = () => {
+  me.nodT = clock.elapsedTime; myAct = 'hallel'; myActT = Date.now();
+  showBubble(selfBubbleHost, '할렐루야'); pushPresence();
 };
 $('#candleBtn').onclick = () => {
   myCandle = !myCandle;
@@ -926,10 +951,16 @@ function startHymn(){
   schedule();
   return { stop(){ stopped = true; clearTimeout(timer); master.gain.setTargetAtTime(0, ctx.currentTime, 0.4); setTimeout(() => ctx.close(), 1500); } };
 }
-$('#hymnBtn').onclick = () => {
-  if (audio) { audio.stop(); audio = null; } else { try { audio = startHymn(); } catch { toast('이 브라우저에서는 소리를 낼 수 없어요'); } }
+function setHymn(on){
+  if (on && !audio) { try { audio = startHymn(); } catch { toast('이 브라우저에서는 소리를 낼 수 없어요'); } }
+  else if (!on && audio) { audio.stop(); audio = null; }
   $('#hymnBtn').setAttribute('aria-pressed', !!audio);
-};
+  $('#hymnOn').setAttribute('aria-pressed', !!audio);
+  $('#hymnOff').setAttribute('aria-pressed', !audio);
+}
+$('#hymnBtn').onclick = () => setHymn(!audio);
+$('#hymnOn').onclick = () => setHymn(true);
+$('#hymnOff').onclick = () => setHymn(false);
 
 // ---------- 이름표 ----------
 const meLabel = document.createElement('div'); meLabel.className = 'label me'; meLabel.textContent = myNick + ' (나)';
