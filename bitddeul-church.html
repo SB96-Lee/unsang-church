@@ -303,16 +303,16 @@ const cross = new THREE.Group(); cross.position.set(0, DAIS_H, -25); scene.add(c
 box(2.4, 0.6, 2.4, marble, 0, 0.3, 0, cross);
 box(0.55, 9.5, 0.55, crossMat, 0, 5.35, 0, cross);
 box(5.2, 0.55, 0.55, crossMat, 0, 7.4, 0, cross);
-// 십자가 양옆 벽화 패널 (sky-jesus.jpg), 십자가 쪽으로 살짝 돌려 세움
-const muralTex = new THREE.TextureLoader().load('sky-jesus.jpg');
-muralTex.encoding = THREE.sRGBEncoding; muralTex.anisotropy = 4;
-for (const s of [-1, 1]) {
-  const mural = new THREE.Group(); mural.position.set(s*7, DAIS_H, -24.3); mural.rotation.y = -s*0.3; scene.add(mural);
-  box(5.8, 1.0, 0.9, marble, 0, 0.5, 0, mural);
-  box(6.0, 0.12, 1.0, gold, 0, 1.02, 0, mural);
-  box(5.4, 4.9, 0.18, gold, 0, 3.55, -0.02, mural);
-  const art = new THREE.Mesh(new THREE.PlaneGeometry(5.0, 4.42), new THREE.MeshBasicMaterial({ map: muralTex, toneMapped: false, color: 0xf0f0f0 }));
-  art.position.set(0, 3.55, 0.08); mural.add(art);
+// 제단 양옆 벽화 패널: 왼쪽 구름 위 예수님, 오른쪽 선한 목자. 가운데 쪽으로 살짝 돌려 세움
+for (const [s, file] of [[-1, 'mural-left.jpg'], [1, 'mural-right.jpg']]) {
+  const tex = new THREE.TextureLoader().load(file);
+  tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
+  const mural = new THREE.Group(); mural.position.set(s*12.6, 0, -22); mural.rotation.y = -s*0.35; // 제단 밖 양옆 바닥 scene.add(mural);
+  box(3.6, 1.0, 0.8, marble, 0, 0.5, 0, mural);
+  box(3.8, 0.12, 0.9, gold, 0, 1.02, 0, mural);
+  box(3.3, 4.2, 0.16, marble, 0, 3.2, -0.02, mural); // 흰 대리석 액자
+  const art = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 3.87), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, color: 0xf0f0f0 }));
+  art.position.set(0, 3.2, 0.08); mural.add(art);
 }
 const crossGlow = sprite(warmGlow, 14, 18, .6); crossGlow.position.set(0, 6.5, -26); scene.add(crossGlow);
 
