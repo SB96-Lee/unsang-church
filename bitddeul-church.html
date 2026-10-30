@@ -71,7 +71,6 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 #toasts{display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none}
 .toast{font-size:13px;padding:7px 14px;border-radius:999px;background:rgba(30,22,14,.62);color:#fbf3e4;animation:rise .35s ease-out}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.hint{font-size:12px;color:rgba(251,243,228,.82);text-shadow:0 1px 6px rgba(0,0,0,.6);text-align:center;pointer-events:none}
 .actions{display:flex;gap:4px;padding:6px}
 .act{border:0;background:transparent;border-radius:16px;width:76px;padding:8px 0 6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12.5px}
 .act svg{width:24px;height:24px}
@@ -79,6 +78,21 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .act[aria-pressed="true"]{background:var(--gold);color:#fff}
 .actions.chip{border-radius:22px}
 
+.shotWrap{position:fixed;inset:0;z-index:10;display:grid;place-items:center;padding:16px;background:rgba(20,14,8,.35)}
+.shotWrap[hidden]{display:none}
+.shot{width:min(400px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--paper-solid);border:1px solid var(--line);border-radius:26px;box-shadow:0 20px 60px rgba(20,12,4,.45);padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px}
+.shot header{display:flex;align-items:center;justify-content:space-between}
+.shot h2{font-family:var(--display);font-size:16px;margin:0 0 0 4px}
+.shot .x{border:0;background:rgba(92,68,36,.08);border-radius:50%;width:34px;height:34px;display:grid;place-items:center}
+.shot .x svg{width:18px;height:18px}
+#shotImg{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:16px;background:#d9cdb8;display:block}
+.shotBtns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.shotBtns .btn{border-radius:999px;padding:12px;font-weight:700}
+.shotLinks{display:flex;justify-content:center;gap:18px}
+.shotLinks button{border:0;background:transparent;display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted);padding:4px}
+.shotLinks svg{width:15px;height:15px}
+.shotLinks button:hover{color:var(--ink)}
+.shot p{margin:0;text-align:center;font-size:11.5px;color:var(--muted)}
 #loader{position:fixed;inset:0;display:grid;place-items:center;background:var(--night);color:#f4e6cc;transition:opacity .6s}
 #loader.done{opacity:0;pointer-events:none}
 #loader div{text-align:center}
@@ -111,6 +125,9 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <svg class="ico-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
       <svg class="ico-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
     </button>
+    <button class="tool" id="shotBtn" title="장면 담기" aria-label="장면 담기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3V19H4z"/><circle cx="12" cy="13.3" r="3.4"/></svg>
+    </button>
     <button class="tool" id="meBtn" aria-expanded="false" aria-controls="mePanel" title="내 이름 바꾸기">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.8 3.6-6 7-6s6.2 2.2 7 6"/></svg>
       <span class="tlabel">내 이름</span>
@@ -139,9 +156,21 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   </form>
 </section>
 
+<div class="shotWrap" id="shotWrap" hidden>
+  <section class="shot" role="dialog" aria-modal="true" aria-labelledby="shotTitle">
+    <header><h2 id="shotTitle">장면 담기</h2><button class="x" id="shotClose" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+    <img id="shotImg" alt="방금 담은 운상 장면">
+    <div class="shotBtns"><button class="btn primary" id="shotShare">장면 보내기</button><button class="btn" id="shotSave">이미지 저장</button></div>
+    <div class="shotLinks">
+      <button id="linkCopy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-8A1.5 1.5 0 0 0 5 5.5V15a1.5 1.5 0 0 0 1.5 1.5H8"/></svg>링크 복사</button>
+      <button id="linkSend"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></svg>링크 보내기</button>
+    </div>
+    <p>링크를 열면 지금 운상 예배당으로 들어와요.</p>
+  </section>
+</div>
+
 <div class="bottom">
   <div id="toasts" aria-live="polite"></div>
-  <div class="hint">WASD 또는 바닥을 눌러 걷기 · 방석을 눌러 앉기 · 기도를 누르면 가까운 방석에 앉아 기도 · 드래그로 둘러보기</div>
   <nav class="actions chip" aria-label="예배당에서 할 일">
     <button class="act" id="prayBtn" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5c-1 2.6-1.6 5.6-1.6 8.6V20M12 3.5c1 2.6 1.6 5.6 1.6 8.6V20"/><path d="M10.4 13 7 16.4V20h3.4M13.6 13 17 16.4V20h-3.4"/></svg>
@@ -880,6 +909,62 @@ function toast(text){
   setTimeout(() => el.remove(), 3200);
 }
 
+// ---------- 장면 담기 ----------
+const SHARE_URL = /workers\.dev$|github\.io$/.test(location.hostname) ? location.origin + location.pathname : 'https://sb96-lee.github.io/unsang-church/';
+let shotBlob = null;
+function takeShot(){
+  renderer.render(scene, camera); // 방금 그린 화면을 바로 읽어야 비어 있지 않음
+  const sw = canvas.width, sh = canvas.height;
+  let cw = Math.round(sh*4/5), ch = sh; if (cw > sw) { cw = sw; ch = Math.round(sw*5/4); }
+  const out = document.createElement('canvas'); out.width = 1080; out.height = 1350;
+  const g = out.getContext('2d');
+  g.drawImage(canvas, (sw - cw)/2, (sh - ch)/2, cw, ch, 0, 0, out.width, out.height);
+  const grad = g.createLinearGradient(0, out.height - 200, 0, out.height);
+  grad.addColorStop(0, 'rgba(20,14,8,0)'); grad.addColorStop(1, 'rgba(20,14,8,.45)');
+  g.fillStyle = grad; g.fillRect(0, out.height - 200, out.width, 200);
+  g.fillStyle = '#fff8ea'; g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = 10;
+  g.font = '700 44px "Gowun Batang", serif'; g.fillText('운상', 48, out.height - 52);
+  const now = new Date();
+  g.font = '30px "Gowun Dodum", sans-serif'; g.textAlign = 'right';
+  g.fillText(`${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`, out.width - 48, out.height - 54);
+  return new Promise(res => out.toBlob(res, 'image/jpeg', 0.92));
+}
+function shotName(){
+  const d = new Date(), z = n => String(n).padStart(2, '0');
+  return `운상_${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}.jpg`;
+}
+function saveShot(){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(shotBlob); a.download = shotName();
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('이미지를 저장했어요');
+}
+async function copyLink(){
+  try { await navigator.clipboard.writeText(SHARE_URL); toast('링크를 복사했어요'); }
+  catch { prompt('이 링크를 복사해 주세요', SHARE_URL); }
+}
+function closeShot(){ $('#shotWrap').hidden = true; }
+$('#shotBtn').onclick = async () => {
+  closePanels();
+  shotBlob = await takeShot();
+  if (!shotBlob) { toast('장면을 담지 못했어요'); return; }
+  const img = $('#shotImg'); if (img.src) URL.revokeObjectURL(img.src); img.src = URL.createObjectURL(shotBlob);
+  $('#shotWrap').hidden = false; $('#shotShare').focus();
+};
+$('#shotClose').onclick = closeShot;
+$('#shotWrap').onclick = e => { if (e.target === e.currentTarget) closeShot(); };
+$('#shotSave').onclick = saveShot;
+$('#shotShare').onclick = async () => {
+  const file = new File([shotBlob], shotName(), { type: 'image/jpeg' });
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: '운상', text: '구름 위 온라인 교회 운상에서\n' + SHARE_URL }); } catch {}
+  } else saveShot();
+};
+$('#linkCopy').onclick = copyLink;
+$('#linkSend').onclick = async () => {
+  if (navigator.share) { try { await navigator.share({ title: '운상', text: '구름 위 온라인 교회 운상', url: SHARE_URL }); } catch {} }
+  else copyLink();
+};
+
 // ---------- 패널 ----------
 function closePanels(){
   $('#peoplePanel').hidden = true; $('#mePanel').hidden = true;
@@ -1060,7 +1145,8 @@ function frame(){
 }
 requestAnimationFrame(() => { frame(); setTimeout(() => $('#loader').classList.add('done'), 250); });
 addEventListener('keydown', e => {
-  if (e.key === 'Escape') closePanels();
+  if (e.key === 'Escape') { closePanels(); closeShot(); }
+  if (!$('#shotWrap').hidden) return;
   if (e.target.closest?.('input, textarea')) return;
   const k = KEYMAP[e.code]; if (k) { keys.add(k); e.preventDefault(); }
 });
